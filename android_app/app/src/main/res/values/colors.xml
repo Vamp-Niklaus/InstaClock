@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="bg_dark">#0D0F17</color>
+    <color name="bg_card">#171B26</color>
+    <color name="bg_card_secondary">#202636</color>
+    <color name="primary">#FF5252</color>
+    <color name="primary_dark">#D50000</color>
+    <color name="accent_insta">#E1306C</color>
+    <color name="insta_purple">#833AB4</color>
+    <color name="insta_orange">#F77737</color>
+    <color name="text_primary">#FFFFFF</color>
+    <color name="text_secondary">#8E97A6</color>
+    <color name="text_muted">#5C6479</color>
+    <color name="success">#00E676</color>
+    <color name="warning">#FFAB00</color>
+    <color name="divider">#262D3D</color>
+    <color name="ic_launcher_bg">#12151E</color>
+</resources>

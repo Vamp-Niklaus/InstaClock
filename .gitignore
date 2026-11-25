@@ -1,0 +1,27 @@
+# Gradle & Android build artifacts
+android_app/.gradle/
+android_app/build/
+android_app/app/build/
+android_app/local.properties
+
+# Keystores & secrets
+*.jks
+*.keystore
+*.pem
+*.p12
+*.env
+
+# Compiled binaries & screenshots
+*.apk
+*.aab
+*.png
+*.jpg
+
+# Legacy / scratch folders
+flutter_alarm_app/
+repo_rea/
+scratch_old/
+
+# OS files
+.DS_Store
+Thumbs.db

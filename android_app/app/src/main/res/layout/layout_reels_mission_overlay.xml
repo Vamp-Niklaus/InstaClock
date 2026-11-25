@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/overlayRoot"
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:gravity="center"
+    android:background="@drawable/bg_reels_overlay"
+    android:elevation="12dp">
+
+    <!-- Top Row: Icon + Watched Progress + Percent -->
+    <LinearLayout
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical">
+
+        <TextView
+            android:id="@+id/tvOverlayIcon"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="🎯"
+            android:textSize="18sp"
+            android:layout_marginEnd="8dp" />
+
+        <TextView
+            android:id="@+id/tvOverlayCount"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Watched: 0 / 10 Reels"
+            android:textColor="#FFFFFF"
+            android:textSize="14sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/tvOverlayPercent"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="0%"
+            android:textColor="#00A8FF"
+            android:textSize="13sp"
+            android:textStyle="bold"
+            android:layout_marginStart="8dp" />
+    </LinearLayout>
+
+    <!-- Progress Bar -->
+    <ProgressBar
+        android:id="@+id/pbOverlayProgress"
+        style="?android:attr/progressBarStyleHorizontal"
+        android:layout_width="220dp"
+        android:layout_height="5dp"
+        android:layout_marginTop="6dp"
+        android:max="10"
+        android:progress="0"
+        android:progressTint="#FF5252"
+        android:progressBackgroundTint="#2D3748" />
+
+    <!-- Subtitle / Action Guidance -->
+    <TextView
+        android:id="@+id/tvOverlayStatus"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="4dp"
+        android:text="⏳ Watch current reel (5s)..."
+        android:textColor="#E2E8F0"
+        android:textSize="11sp" />
+
+</LinearLayout>

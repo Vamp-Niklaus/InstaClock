@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources xmlns:tools="http://schemas.android.com/tools">
+    <style name="Theme.Instalarm" parent="Theme.Material3.DayNight.NoActionBar">
+        <item name="colorPrimary">#2196F3</item>
+        <item name="colorOnPrimary">#FFFFFF</item>
+        <item name="colorPrimaryContainer">#1E293B</item>
+        <item name="colorOnPrimaryContainer">#90CAF9</item>
+        <item name="colorSurfaceVariant">#1E222B</item>
+        <item name="colorOutlineVariant">#2D3748</item>
+        <item name="android:windowBackground">#121212</item>
+        <item name="android:statusBarColor">#121212</item>
+        <item name="android:navigationBarColor">#121212</item>
+    </style>
+
+    <style name="Theme.Instalarm.FullScreen" parent="Theme.Material3.DayNight.NoActionBar">
+        <item name="android:windowFullscreen">true</item>
+        <item name="android:windowBackground">#121212</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">#121212</item>
+    </style>
+    <style name="Theme.Instalarm.Dialog" parent="Theme.Material3.DayNight.NoActionBar">
+        <item name="android:windowBackground">#0D0F14</item>
+        <item name="android:statusBarColor">#0D0F14</item>
+        <item name="android:navigationBarColor">#0D0F14</item>
+        <item name="android:windowLightStatusBar">false</item>
+    </style>
+
+    <style name="ShapeAppearanceOverlay.Circle" parent="">
+        <item name="cornerFamily">rounded</item>
+        <item name="cornerSize">50%</item>
+    </style>
+</resources>

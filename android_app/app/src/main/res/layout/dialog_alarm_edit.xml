@@ -1,0 +1,582 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:fitsSystemWindows="true"
+    android:orientation="vertical"
+    android:background="#0D0F14">
+
+    <!-- Top Header Bar (Alarmy Image 4) -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:paddingTop="10dp"
+        android:paddingBottom="10dp"
+        android:paddingHorizontal="16dp">
+
+        <ImageButton
+            android:id="@+id/btnCancelAlarm"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:background="?android:attr/selectableItemBackgroundBorderless"
+            android:src="@android:drawable/ic_menu_close_clear_cancel"
+            app:tint="#FFFFFF"
+            android:contentDescription="Cancel" />
+
+        <TextView
+            android:id="@+id/tvEditDialogTitle"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="Wake-up alarm"
+            android:textColor="#FFFFFF"
+            android:textSize="18sp"
+            android:fontFamily="sans-serif-medium"
+            android:gravity="center" />
+
+        <View
+            android:layout_width="40dp"
+            android:layout_height="40dp" />
+    </LinearLayout>
+
+    <ScrollView
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:paddingHorizontal="18dp"
+            android:paddingBottom="24dp">
+
+            <!-- Label Row (☀️ Alarm name + pencil) -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:layout_marginTop="6dp"
+                android:paddingHorizontal="4dp">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="☀️ "
+                    android:textSize="22sp" />
+
+                <EditText
+                    android:id="@+id/etAlarmLabel"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:background="@null"
+                    android:hint="Alarm name"
+                    android:textColor="#FFFFFF"
+                    android:textColorHint="#64748B"
+                    android:textSize="17sp"
+                    android:inputType="textCapSentences"
+                    android:maxLines="1" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="✏️"
+                    android:textSize="15sp" />
+            </LinearLayout>
+
+            <!-- Countdown Subtitle -->
+            <TextView
+                android:id="@+id/tvEditRingCountdown"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="14dp"
+                android:gravity="center"
+                android:text="Ring in 14 hr. 30 min"
+                android:textColor="#CBD5E1"
+                android:textSize="14sp" />
+
+            <!-- Custom Alarmy-Style 3-Wheel Time Picker -->
+            <FrameLayout
+                android:layout_width="match_parent"
+                android:layout_height="180dp"
+                android:layout_marginTop="8dp"
+                android:paddingHorizontal="12dp">
+
+                <!-- Center Highlight Pill -->
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="52dp"
+                    android:layout_gravity="center"
+                    android:background="@drawable/bg_dark_pill" />
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:gravity="center"
+                    android:orientation="horizontal">
+
+                    <NumberPicker
+                        android:id="@+id/npHour"
+                        android:layout_width="76dp"
+                        android:layout_height="match_parent"
+                        android:theme="@style/Theme.Instalarm" />
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginHorizontal="6dp"
+                        android:text=":"
+                        android:textColor="#FFFFFF"
+                        android:textSize="28sp"
+                        android:textStyle="bold" />
+
+                    <NumberPicker
+                        android:id="@+id/npMinute"
+                        android:layout_width="76dp"
+                        android:layout_height="match_parent"
+                        android:theme="@style/Theme.Instalarm" />
+
+                    <NumberPicker
+                        android:id="@+id/npAmPm"
+                        android:layout_width="76dp"
+                        android:layout_height="match_parent"
+                        android:layout_marginStart="12dp"
+                        android:theme="@style/Theme.Instalarm" />
+                </LinearLayout>
+            </FrameLayout>
+
+            <!-- Repeat Section (Daily + Checkbox + S M T W T F S) -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="10dp"
+                android:orientation="horizontal"
+                android:gravity="center_vertical">
+
+                <TextView
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="Daily"
+                    android:textColor="#FFFFFF"
+                    android:textSize="15sp" />
+
+                <CheckBox
+                    android:id="@+id/cbDaily"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:buttonTint="#38BDF8"
+                    android:checked="false" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Daily"
+                    android:textColor="#FFFFFF"
+                    android:textSize="14sp" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center"
+                android:layout_marginTop="8dp">
+
+                <ToggleButton
+                    android:id="@+id/btnDaySun"
+                    android:layout_width="0dp"
+                    android:layout_height="44dp"
+                    android:layout_weight="1"
+                    android:textOn="S"
+                    android:textOff="S"
+                    android:background="@drawable/selector_day_circle_bg"
+                    android:textColor="@color/selector_day_text_color"
+                    android:textSize="13sp"
+                    android:textStyle="bold"
+                    android:layout_margin="3dp" />
+
+                <ToggleButton
+                    android:id="@+id/btnDayMon"
+                    android:layout_width="0dp"
+                    android:layout_height="44dp"
+                    android:layout_weight="1"
+                    android:textOn="M"
+                    android:textOff="M"
+                    android:background="@drawable/selector_day_circle_bg"
+                    android:textColor="@color/selector_day_text_color"
+                    android:textSize="13sp"
+                    android:textStyle="bold"
+                    android:layout_margin="3dp" />
+
+                <ToggleButton
+                    android:id="@+id/btnDayTue"
+                    android:layout_width="0dp"
+                    android:layout_height="44dp"
+                    android:layout_weight="1"
+                    android:textOn="T"
+                    android:textOff="T"
+                    android:background="@drawable/selector_day_circle_bg"
+                    android:textColor="@color/selector_day_text_color"
+                    android:textSize="13sp"
+                    android:textStyle="bold"
+                    android:layout_margin="3dp" />
+
+                <ToggleButton
+                    android:id="@+id/btnDayWed"
+                    android:layout_width="0dp"
+                    android:layout_height="44dp"
+                    android:layout_weight="1"
+                    android:textOn="W"
+                    android:textOff="W"
+                    android:background="@drawable/selector_day_circle_bg"
+                    android:textColor="@color/selector_day_text_color"
+                    android:textSize="13sp"
+                    android:textStyle="bold"
+                    android:layout_margin="3dp" />
+
+                <ToggleButton
+                    android:id="@+id/btnDayThu"
+                    android:layout_width="0dp"
+                    android:layout_height="44dp"
+                    android:layout_weight="1"
+                    android:textOn="T"
+                    android:textOff="T"
+                    android:background="@drawable/selector_day_circle_bg"
+                    android:textColor="@color/selector_day_text_color"
+                    android:textSize="13sp"
+                    android:textStyle="bold"
+                    android:layout_margin="3dp" />
+
+                <ToggleButton
+                    android:id="@+id/btnDayFri"
+                    android:layout_width="0dp"
+                    android:layout_height="44dp"
+                    android:layout_weight="1"
+                    android:textOn="F"
+                    android:textOff="F"
+                    android:background="@drawable/selector_day_circle_bg"
+                    android:textColor="@color/selector_day_text_color"
+                    android:textSize="13sp"
+                    android:textStyle="bold"
+                    android:layout_margin="3dp" />
+
+                <ToggleButton
+                    android:id="@+id/btnDaySat"
+                    android:layout_width="0dp"
+                    android:layout_height="44dp"
+                    android:layout_weight="1"
+                    android:textOn="S"
+                    android:textOff="S"
+                    android:background="@drawable/selector_day_circle_bg"
+                    android:textColor="@color/selector_day_text_color"
+                    android:textSize="13sp"
+                    android:textStyle="bold"
+                    android:layout_margin="3dp" />
+            </LinearLayout>
+
+            <!-- Wake-Up Mission Card (Alarmy Image 4 & 5) -->
+            <com.google.android.material.card.MaterialCardView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="18dp"
+                app:cardBackgroundColor="#151821"
+                app:cardCornerRadius="20dp"
+                app:strokeWidth="0dp">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:padding="18dp">
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal"
+                        android:gravity="center_vertical">
+
+                        <TextView
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:text="Wake-up mission"
+                            android:textColor="#FFFFFF"
+                            android:textSize="16sp"
+                            android:fontFamily="sans-serif-medium" />
+
+                        <TextView
+                            android:id="@+id/tvMissionCountBadge"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="1/1"
+                            android:textColor="#94A3B8"
+                            android:textSize="14sp" />
+                    </LinearLayout>
+
+                    <!-- Mission Slot Button (+ or Selected Mission) -->
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="14dp"
+                        android:orientation="horizontal"
+                        android:gravity="center_vertical">
+
+                        <com.google.android.material.card.MaterialCardView
+                            android:id="@+id/cardMissionSlot"
+                            android:layout_width="80dp"
+                            android:layout_height="80dp"
+                            app:cardBackgroundColor="#1E2330"
+                            app:cardCornerRadius="16dp"
+                            app:strokeColor="#2D3748"
+                            app:strokeWidth="1dp">
+
+                            <LinearLayout
+                                android:layout_width="match_parent"
+                                android:layout_height="match_parent"
+                                android:gravity="center"
+                                android:orientation="vertical"
+                                android:padding="6dp">
+
+                                <TextView
+                                    android:id="@+id/tvMissionSlotIcon"
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:text="📸"
+                                    android:textSize="24sp" />
+
+                                <TextView
+                                    android:id="@+id/tvMissionSlotLabel"
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:layout_marginTop="2dp"
+                                    android:text="10 Reels"
+                                    android:textColor="#E2E8F0"
+                                    android:textSize="11sp"
+                                    android:gravity="center"
+                                    android:maxLines="1" />
+                            </LinearLayout>
+                        </com.google.android.material.card.MaterialCardView>
+
+                        <TextView
+                            android:id="@+id/tvMissionSlotHint"
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:layout_marginStart="14dp"
+                            android:text="Tap to change mission"
+                            android:textColor="#94A3B8"
+                            android:textSize="13sp" />
+                    </LinearLayout>
+
+                    <!-- Prevent power-off row -->
+                    <LinearLayout
+                        android:id="@+id/rowPreventPowerOff"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="18dp"
+                        android:gravity="center_vertical"
+                        android:orientation="horizontal"
+                        android:paddingVertical="6dp">
+
+                        <TextView
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:text="Prevent power-off"
+                            android:textColor="#FFFFFF"
+                            android:textSize="15sp" />
+
+                        <com.google.android.material.switchmaterial.SwitchMaterial
+                            android:id="@+id/switchPreventPowerOff"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            app:thumbTint="@color/switch_thumb_selector"
+                            app:trackTint="@color/switch_track_selector" />
+                    </LinearLayout>
+
+                    <!-- Prevent app uninstall row -->
+                    <LinearLayout
+                        android:id="@+id/rowPreventUninstall"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="4dp"
+                        android:gravity="center_vertical"
+                        android:orientation="horizontal"
+                        android:paddingVertical="6dp">
+
+                        <TextView
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:text="Prevent app uninstall"
+                            android:textColor="#FFFFFF"
+                            android:textSize="15sp" />
+
+                        <com.google.android.material.switchmaterial.SwitchMaterial
+                            android:id="@+id/switchPreventUninstall"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            app:thumbTint="@color/switch_thumb_selector"
+                            app:trackTint="@color/switch_track_selector" />
+                    </LinearLayout>
+                </LinearLayout>
+            </com.google.android.material.card.MaterialCardView>
+
+            <!-- Alarm Sound Section (Alarmy Image 5) -->
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="20dp"
+                android:layout_marginStart="4dp"
+                android:text="Alarm sound"
+                android:textColor="#94A3B8"
+                android:textSize="13sp" />
+
+            <com.google.android.material.card.MaterialCardView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                app:cardBackgroundColor="#151821"
+                app:cardCornerRadius="20dp"
+                app:strokeWidth="0dp">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:padding="18dp">
+
+                    <!-- Sound Row -->
+                    <LinearLayout
+                        android:id="@+id/btnSelectSound"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal"
+                        android:gravity="center_vertical"
+                        android:paddingVertical="6dp"
+                        android:clickable="true"
+                        android:focusable="true">
+
+                        <TextView
+                            android:layout_width="34dp"
+                            android:layout_height="34dp"
+                            android:background="@drawable/bg_dark_pill"
+                            android:gravity="center"
+                            android:text="▶"
+                            android:textColor="#FFFFFF"
+                            android:textSize="12sp" />
+
+                        <TextView
+                            android:id="@+id/tvSelectedSound"
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:layout_marginStart="12dp"
+                            android:text="Default alarm"
+                            android:textColor="#FFFFFF"
+                            android:textSize="15sp" />
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="›"
+                            android:textColor="#94A3B8"
+                            android:textSize="22sp" />
+                    </LinearLayout>
+
+                    <!-- Vibration Switch -->
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal"
+                        android:gravity="center_vertical"
+                        android:layout_marginTop="10dp"
+                        android:paddingVertical="4dp">
+
+                        <TextView
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:text="📳  Vibration"
+                            android:textColor="#FFFFFF"
+                            android:textSize="15sp" />
+
+                        <com.google.android.material.switchmaterial.SwitchMaterial
+                            android:id="@+id/switchVibrate"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:checked="true"
+                            app:thumbTint="@color/switch_thumb_selector"
+                            app:trackTint="@color/switch_track_selector" />
+                    </LinearLayout>
+
+                    <!-- Snooze Duration -->
+                    <LinearLayout
+                        android:id="@+id/btnSelectSnoozeDuration"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal"
+                        android:gravity="center_vertical"
+                        android:layout_marginTop="10dp"
+                        android:paddingVertical="6dp"
+                        android:clickable="true"
+                        android:focusable="true">
+
+                        <TextView
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:text="Snooze"
+                            android:textColor="#FFFFFF"
+                            android:textSize="15sp" />
+
+                        <TextView
+                            android:id="@+id/tvSelectedSnooze"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="5 minutes"
+                            android:textColor="#94A3B8"
+                            android:textSize="14sp"
+                            android:layout_marginEnd="6dp" />
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="›"
+                            android:textColor="#94A3B8"
+                            android:textSize="22sp" />
+                    </LinearLayout>
+                </LinearLayout>
+            </com.google.android.material.card.MaterialCardView>
+        </LinearLayout>
+    </ScrollView>
+
+    <!-- Sticky Bottom Red Save Button (Alarmy Image 4 & 5) -->
+    <FrameLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="#0D0F14"
+        android:paddingHorizontal="18dp"
+        android:paddingTop="8dp"
+        android:paddingBottom="20dp">
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnSaveAlarmBottom"
+            android:layout_width="match_parent"
+            android:layout_height="54dp"
+            android:backgroundTint="#FF4757"
+            android:text="Save"
+            android:textAllCaps="false"
+            android:textColor="#FFFFFF"
+            android:textSize="16sp"
+            android:textStyle="bold"
+            app:cornerRadius="16dp" />
+    </FrameLayout>
+</LinearLayout>

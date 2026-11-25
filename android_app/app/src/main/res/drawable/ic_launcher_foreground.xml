@@ -1,0 +1,49 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <group
+        android:pivotX="54"
+        android:pivotY="54"
+        android:scaleX="0.68"
+        android:scaleY="0.68">
+
+        <!-- Sleek minimalist alarm clock ring with twin ears -->
+        <path
+            android:pathData="M36,28 C31.5,28 28,31.5 28,36 C28,37.3 28.4,38.5 29.0,39.6 C26.5,43.8 25,48.7 25,54 C25,70.0 38.0,83 54,83 C70.0,83 83,70.0 83,54 C83,48.7 81.5,43.8 79.0,39.6 C79.6,38.5 80,37.3 80,36 C80,31.5 76.5,28 72,28 C69.6,28 67.4,29.0 65.9,30.7 C62.3,29.0 58.3,28 54,28 C49.7,28 45.7,29.0 42.1,30.7 C40.6,29.0 38.4,28 36,28 Z M54,34.5 C64.8,34.5 73.5,43.2 73.5,54 C73.5,64.8 64.8,73.5 54,73.5 C43.2,73.5 34.5,64.8 34.5,54 C34.5,43.2 43.2,34.5 54,34.5 Z">
+            <aapt:attr name="android:fillColor">
+                <gradient
+                    android:type="linear"
+                    android:startX="25"
+                    android:startY="28"
+                    android:endX="83"
+                    android:endY="83">
+                    <item android:offset="0.0" android:color="#FF4757" />
+                    <item android:offset="1.0" android:color="#38BDF8" />
+                </gradient>
+            </aapt:attr>
+        </path>
+
+        <!-- Clean thin rounded clock hands -->
+        <path
+            android:pathData="M54,42 L54,54 L61.5,61.5"
+            android:strokeWidth="5.5"
+            android:strokeLineCap="round"
+            android:strokeLineJoin="round">
+            <aapt:attr name="android:strokeColor">
+                <gradient
+                    android:type="linear"
+                    android:startX="25"
+                    android:startY="28"
+                    android:endX="83"
+                    android:endY="83">
+                    <item android:offset="0.0" android:color="#FF4757" />
+                    <item android:offset="1.0" android:color="#38BDF8" />
+                </gradient>
+            </aapt:attr>
+        </path>
+    </group>
+</vector>
