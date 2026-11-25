@@ -31,6 +31,7 @@ public class RingingActivity extends AppCompatActivity implements SensorEventLis
     private long alarmId;
     private String label;
     private String dismissTask;
+    private String remainingTasks;
     private String soundUri;
     private boolean vibrate;
     private int snoozeDuration;
@@ -106,6 +107,8 @@ public class RingingActivity extends AppCompatActivity implements SensorEventLis
         if (label == null || label.trim().isEmpty()) label = "Alarm";
         dismissTask = intent.getStringExtra("dismiss_task");
         if (dismissTask == null) dismissTask = "none";
+        remainingTasks = intent.getStringExtra("remaining_tasks");
+        if (remainingTasks == null) remainingTasks = "";
         soundUri = intent.getStringExtra("sound_uri");
         vibrate = intent.getBooleanExtra("vibrate", true);
         snoozeDuration = intent.getIntExtra("snooze_duration", 5);
@@ -347,6 +350,14 @@ public class RingingActivity extends AppCompatActivity implements SensorEventLis
     private void onDismissClicked() {
         if (!isTaskCompleted) {
             Toast.makeText(this, "Please complete the task to dismiss!", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        if (remainingTasks != null && !remainingTasks.trim().isEmpty()) {
+            String nextChain = remainingTasks.trim();
+            remainingTasks = "";
+            AlarmReceiver.launchNextMission(this, alarmId, label, soundUri, vibrate, snoozeDuration, nextChain);
+            finish();
             return;
         }
 

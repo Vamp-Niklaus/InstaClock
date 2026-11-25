@@ -55,6 +55,7 @@ import java.util.List;
 public class MainActivity extends AppCompatActivity implements AlarmsAdapter.OnAlarmActionListener {
 
     private static final int REQUEST_RINGTONE_PICKER = 777;
+    private static final int REQUEST_AUDIO_FILE_PICKER = 778;
     private static final int REQUEST_DEVICE_ADMIN = 888;
 
     // View containers
@@ -311,7 +312,10 @@ public class MainActivity extends AppCompatActivity implements AlarmsAdapter.OnA
         });
 
         findViewById(R.id.rowSettingSnooze).setOnClickListener(v -> showSnoozePicker(null));
-        findViewById(R.id.rowSettingSound).setOnClickListener(v -> openRingtonePicker(null));
+        findViewById(R.id.rowSettingSound).setOnClickListener(v -> {
+            currentDialogSoundTextView = null;
+            openRingtonePicker(null);
+        });
         findViewById(R.id.rowSettingExactAlarm).setOnClickListener(v -> openExactAlarmSettings());
 
         View rowAppUpdate = findViewById(R.id.rowSettingAppUpdate);
@@ -965,40 +969,52 @@ public class MainActivity extends AppCompatActivity implements AlarmsAdapter.OnA
             if (isChecked) requestDeviceAdminActivation();
         });
 
-        final String[] selectedTask = {alarmToEdit != null ? alarmToEdit.getDismissTask() : "reels_10"};
+        final String[] missionSlots = new String[]{"reels_10", "", ""};
         TextView tvMissionCountBadge = dialog.findViewById(R.id.tvMissionCountBadge);
-        TextView tvMissionSlotIcon = dialog.findViewById(R.id.tvMissionSlotIcon);
-        TextView tvMissionSlotLabel = dialog.findViewById(R.id.tvMissionSlotLabel);
-        TextView tvMissionSlotHint = dialog.findViewById(R.id.tvMissionSlotHint);
-
-        Runnable updateMissionSlotUI = () -> {
-            String t = selectedTask[0];
-            if (t == null || "none".equalsIgnoreCase(t)) {
-                tvMissionCountBadge.setText("0/1");
-                tvMissionSlotIcon.setText("+");
-                tvMissionSlotLabel.setText("Add");
-                tvMissionSlotHint.setText("Tap to add mission");
-            } else if (t.startsWith("reels")) {
-                String count = t.contains("_") ? t.split("_")[1] : "10";
-                tvMissionCountBadge.setText("1/1");
-                tvMissionSlotIcon.setText("📸");
-                tvMissionSlotLabel.setText(count + " Reels");
-                tvMissionSlotHint.setText("Instagram Reels (" + count + ")");
-            } else if ("math".equalsIgnoreCase(t)) {
-                tvMissionCountBadge.setText("1/1");
-                tvMissionSlotIcon.setText("🧮");
-                tvMissionSlotLabel.setText("Math");
-                tvMissionSlotHint.setText("Math (3 problems)");
-            } else if ("shake".equalsIgnoreCase(t)) {
-                tvMissionCountBadge.setText("1/1");
-                tvMissionSlotIcon.setText("📳");
-                tvMissionSlotLabel.setText("Shake");
-                tvMissionSlotHint.setText("Shake (20 times)");
-            }
+        TextView[] slotIcons = new TextView[]{
+                dialog.findViewById(R.id.tvMissionSlot1Icon),
+                dialog.findViewById(R.id.tvMissionSlot2Icon),
+                dialog.findViewById(R.id.tvMissionSlot3Icon)
+        };
+        TextView[] slotLabels = new TextView[]{
+                dialog.findViewById(R.id.tvMissionSlot1Label),
+                dialog.findViewById(R.id.tvMissionSlot2Label),
+                dialog.findViewById(R.id.tvMissionSlot3Label)
         };
 
-        dialog.findViewById(R.id.cardMissionSlot).setOnClickListener(v ->
-                showMissionPickerSheet(selectedTask, updateMissionSlotUI));
+        Runnable updateMissionSlotUI = () -> {
+            int activeCount = 0;
+            for (int i = 0; i < 3; i++) {
+                String t = missionSlots[i] != null ? missionSlots[i].trim() : "";
+                if (t.isEmpty() || "none".equalsIgnoreCase(t)) {
+                    slotIcons[i].setText("+");
+                    slotIcons[i].setTextColor(0xFF64748B);
+                    slotLabels[i].setText("");
+                } else {
+                    activeCount++;
+                    slotIcons[i].setTextColor(0xFFFFFFFF);
+                    if (t.startsWith("reels")) {
+                        String count = t.contains("_") ? t.split("_")[1] : "10";
+                        slotIcons[i].setText("📸");
+                        slotLabels[i].setText(count + " Reels");
+                    } else if ("math".equalsIgnoreCase(t)) {
+                        slotIcons[i].setText("🧮");
+                        slotLabels[i].setText("Math");
+                    } else if ("shake".equalsIgnoreCase(t)) {
+                        slotIcons[i].setText("📳");
+                        slotLabels[i].setText("Shake");
+                    }
+                }
+            }
+            tvMissionCountBadge.setText(activeCount + "/3");
+        };
+
+        dialog.findViewById(R.id.cardMissionSlot1).setOnClickListener(v ->
+                showMissionPickerSheet(0, missionSlots, updateMissionSlotUI));
+        dialog.findViewById(R.id.cardMissionSlot2).setOnClickListener(v ->
+                showMissionPickerSheet(1, missionSlots, updateMissionSlotUI));
+        dialog.findViewById(R.id.cardMissionSlot3).setOnClickListener(v ->
+                showMissionPickerSheet(2, missionSlots, updateMissionSlotUI));
 
         TextView tvSelectedSound = dialog.findViewById(R.id.tvSelectedSound);
         TextView tvSelectedSnooze = dialog.findViewById(R.id.tvSelectedSnooze);
@@ -1111,7 +1127,19 @@ public class MainActivity extends AppCompatActivity implements AlarmsAdapter.OnA
             cbDaily.setChecked(isDaily || (btnSun.isChecked() && btnMon.isChecked() && btnTue.isChecked()
                     && btnWed.isChecked() && btnThu.isChecked() && btnFri.isChecked() && btnSat.isChecked()));
 
-            selectedTask[0] = alarmToEdit.getDismissTask();
+            String rawTask = alarmToEdit.getDismissTask();
+            missionSlots[0] = "";
+            missionSlots[1] = "";
+            missionSlots[2] = "";
+            if (rawTask != null && !"none".equalsIgnoreCase(rawTask)) {
+                String[] parts = rawTask.split("\\|");
+                for (int i = 0; i < Math.min(3, parts.length); i++) {
+                    String p = parts[i].trim();
+                    if (!p.isEmpty() && !"none".equalsIgnoreCase(p)) {
+                        missionSlots[i] = p;
+                    }
+                }
+            }
         } else {
             tvTitle.setText("Wake-up alarm");
             npAmPm.setValue(0);
@@ -1119,7 +1147,9 @@ public class MainActivity extends AppCompatActivity implements AlarmsAdapter.OnA
             npMinute.setValue(0);
             etLabel.setText("Wake up early");
             switchVibrate.setChecked(true);
-            selectedTask[0] = "reels_10";
+            missionSlots[0] = "reels_10";
+            missionSlots[1] = "";
+            missionSlots[2] = "";
 
             // Default to Weekdays checked
             btnMon.setChecked(true);
@@ -1161,7 +1191,14 @@ public class MainActivity extends AppCompatActivity implements AlarmsAdapter.OnA
                 daysFormatted = String.join(",", activeDays);
             }
 
-            String dismissTask = selectedTask[0] != null ? selectedTask[0] : "reels_10";
+            List<String> chosenTasks = new ArrayList<>();
+            for (int i = 0; i < 3; i++) {
+                String t = missionSlots[i] != null ? missionSlots[i].trim() : "";
+                if (!t.isEmpty() && !"none".equalsIgnoreCase(t)) {
+                    chosenTasks.add(t);
+                }
+            }
+            String dismissTask = chosenTasks.isEmpty() ? "none" : String.join("|", chosenTasks);
             boolean vibrate = switchVibrate.isChecked();
 
             AlarmModel alarm;
@@ -1208,7 +1245,7 @@ public class MainActivity extends AppCompatActivity implements AlarmsAdapter.OnA
         dialog.show();
     }
 
-    private void showMissionPickerSheet(String[] selectedTask, Runnable onUpdated) {
+    private void showMissionPickerSheet(int slotIndex, String[] missionSlots, Runnable onUpdated) {
         BottomSheetDialog picker = new BottomSheetDialog(this);
         picker.setContentView(R.layout.dialog_mission_picker);
 
@@ -1216,23 +1253,23 @@ public class MainActivity extends AppCompatActivity implements AlarmsAdapter.OnA
 
         picker.findViewById(R.id.rowMissionReels).setOnClickListener(v -> {
             picker.dismiss();
-            showReelsCountDrawer(selectedTask, onUpdated);
+            showReelsCountDrawer(slotIndex, missionSlots, onUpdated);
         });
 
         picker.findViewById(R.id.rowMissionMath).setOnClickListener(v -> {
-            selectedTask[0] = "math";
+            missionSlots[slotIndex] = "math";
             onUpdated.run();
             picker.dismiss();
         });
 
         picker.findViewById(R.id.rowMissionShake).setOnClickListener(v -> {
-            selectedTask[0] = "shake";
+            missionSlots[slotIndex] = "shake";
             onUpdated.run();
             picker.dismiss();
         });
 
         picker.findViewById(R.id.rowMissionNone).setOnClickListener(v -> {
-            selectedTask[0] = "none";
+            missionSlots[slotIndex] = "";
             onUpdated.run();
             picker.dismiss();
         });
@@ -1240,15 +1277,15 @@ public class MainActivity extends AppCompatActivity implements AlarmsAdapter.OnA
         picker.show();
     }
 
-    private void showReelsCountDrawer(String[] selectedTask, Runnable onUpdated) {
+    private void showReelsCountDrawer(int slotIndex, String[] missionSlots, Runnable onUpdated) {
         BottomSheetDialog drawer = new BottomSheetDialog(this);
         drawer.setContentView(R.layout.dialog_mission_reels_config);
 
         NumberPicker npReelCount = drawer.findViewById(R.id.npReelCount);
         int currentCount = 10;
-        if (selectedTask[0] != null && selectedTask[0].startsWith("reels_")) {
+        if (missionSlots[slotIndex] != null && missionSlots[slotIndex].startsWith("reels_")) {
             try {
-                currentCount = Integer.parseInt(selectedTask[0].split("_")[1]);
+                currentCount = Integer.parseInt(missionSlots[slotIndex].split("_")[1]);
             } catch (Exception ignored) {}
         }
         if (npReelCount != null) {
@@ -1260,12 +1297,12 @@ public class MainActivity extends AppCompatActivity implements AlarmsAdapter.OnA
 
         drawer.findViewById(R.id.btnReelsConfigBack).setOnClickListener(v -> {
             drawer.dismiss();
-            showMissionPickerSheet(selectedTask, onUpdated);
+            showMissionPickerSheet(slotIndex, missionSlots, onUpdated);
         });
         drawer.findViewById(R.id.btnReelsConfigClose).setOnClickListener(v -> drawer.dismiss());
         drawer.findViewById(R.id.btnReelsConfigComplete).setOnClickListener(v -> {
             int count = npReelCount != null ? npReelCount.getValue() : 10;
-            selectedTask[0] = "reels_" + count;
+            missionSlots[slotIndex] = "reels_" + count;
             onUpdated.run();
             drawer.dismiss();
         });
@@ -1296,45 +1333,142 @@ public class MainActivity extends AppCompatActivity implements AlarmsAdapter.OnA
     }
 
     private void openRingtonePicker(String currentUriStr) {
-        Intent intent = new Intent(RingtoneManager.ACTION_RINGTONE_PICKER);
-        intent.putExtra(RingtoneManager.EXTRA_RINGTONE_TYPE, RingtoneManager.TYPE_ALARM);
-        intent.putExtra(RingtoneManager.EXTRA_RINGTONE_TITLE, "Select Alarm Sound");
-        intent.putExtra(RingtoneManager.EXTRA_RINGTONE_SHOW_DEFAULT, true);
-        intent.putExtra(RingtoneManager.EXTRA_RINGTONE_SHOW_SILENT, false);
+        // Show cached sounds + File Manager audio picker + Default alarm
+        List<String> labels = new ArrayList<>();
+        List<String> uris = new ArrayList<>();
+        List<String> names = new ArrayList<>();
 
-        if (currentUriStr != null && !currentUriStr.isEmpty()) {
-            intent.putExtra(RingtoneManager.EXTRA_RINGTONE_EXISTING_URI, Uri.parse(currentUriStr));
-        } else {
-            Uri defaultUri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM);
-            intent.putExtra(RingtoneManager.EXTRA_RINGTONE_EXISTING_URI, defaultUri);
+        labels.add("📁 Choose audio from File Manager");
+        uris.add("__PICK_FILE__");
+        names.add("");
+
+        labels.add("🔔 Default alarm");
+        uris.add("");
+        names.add("Default alarm");
+
+        try {
+            String jsonStr = settingsPrefs.getString("cached_sounds_json", "[]");
+            org.json.JSONArray arr = new org.json.JSONArray(jsonStr);
+            for (int i = 0; i < arr.length(); i++) {
+                org.json.JSONObject obj = arr.getJSONObject(i);
+                String n = obj.optString("name", "");
+                String u = obj.optString("uri", "");
+                if (!n.isEmpty() && !u.isEmpty()) {
+                    java.io.File f = new java.io.File(Uri.parse(u).getPath());
+                    if (f.exists()) {
+                        labels.add("🎵 " + n);
+                        uris.add(u);
+                        names.add(n);
+                    }
+                }
+            }
+        } catch (Exception ignored) {}
+
+        new AlertDialog.Builder(this)
+                .setTitle("Alarm Sound")
+                .setItems(labels.toArray(new String[0]), (dialog, which) -> {
+                    String chosenUri = uris.get(which);
+                    if ("__PICK_FILE__".equals(chosenUri)) {
+                        Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT);
+                        intent.addCategory(Intent.CATEGORY_OPENABLE);
+                        intent.setType("audio/*");
+                        startActivityForResult(intent, REQUEST_AUDIO_FILE_PICKER);
+                    } else {
+                        String chosenName = names.get(which);
+                        applySelectedSound(chosenUri, chosenName);
+                    }
+                })
+                .show();
+    }
+
+    private void applySelectedSound(String uriStr, String name) {
+        currentSelectedSoundUri = uriStr;
+        currentSelectedSoundName = name;
+
+        if (currentDialogSoundTextView != null) {
+            currentDialogSoundTextView.setText(name);
         }
 
-        startActivityForResult(intent, REQUEST_RINGTONE_PICKER);
+        settingsPrefs.edit()
+                .putString("default_sound_uri", currentSelectedSoundUri)
+                .putString("default_sound_name", currentSelectedSoundName)
+                .apply();
+
+        updateSettingsDisplay();
+    }
+
+    private void cacheAndSelectAudioFile(Uri sourceUri) {
+        try {
+            String displayName = "Custom Sound";
+            try (android.database.Cursor cursor = getContentResolver().query(sourceUri, null, null, null, null)) {
+                if (cursor != null && cursor.moveToFirst()) {
+                    int nameIdx = cursor.getColumnIndex(android.provider.OpenableColumns.DISPLAY_NAME);
+                    if (nameIdx >= 0) {
+                        displayName = cursor.getString(nameIdx);
+                    }
+                }
+            }
+
+            java.io.File soundsDir = new java.io.File(getFilesDir(), "sounds");
+            if (!soundsDir.exists()) soundsDir.mkdirs();
+            java.io.File destFile = new java.io.File(soundsDir, "alarm_" + System.currentTimeMillis() + ".audio");
+
+            try (java.io.InputStream in = getContentResolver().openInputStream(sourceUri);
+                 java.io.OutputStream out = new java.io.FileOutputStream(destFile)) {
+                if (in == null) {
+                    Toast.makeText(this, "Could not read audio file", Toast.LENGTH_SHORT).show();
+                    return;
+                }
+                byte[] buf = new byte[8192];
+                int len;
+                while ((len = in.read(buf)) > 0) {
+                    out.write(buf, 0, len);
+                }
+            }
+
+            String cachedUri = Uri.fromFile(destFile).toString();
+            saveCachedSoundEntry(displayName, cachedUri);
+            applySelectedSound(cachedUri, displayName);
+            Toast.makeText(this, "Sound cached: " + displayName, Toast.LENGTH_SHORT).show();
+        } catch (Exception e) {
+            Toast.makeText(this, "Failed to load audio file", Toast.LENGTH_SHORT).show();
+        }
+    }
+
+    private void saveCachedSoundEntry(String name, String uri) {
+        try {
+            org.json.JSONArray existing = new org.json.JSONArray(settingsPrefs.getString("cached_sounds_json", "[]"));
+            org.json.JSONArray updated = new org.json.JSONArray();
+            org.json.JSONObject newest = new org.json.JSONObject();
+            newest.put("name", name);
+            newest.put("uri", uri);
+            updated.put(newest);
+
+            for (int i = 0; i < existing.length() && updated.length() < 10; i++) {
+                org.json.JSONObject obj = existing.getJSONObject(i);
+                if (!name.equals(obj.optString("name"))) {
+                    updated.put(obj);
+                }
+            }
+            settingsPrefs.edit().putString("cached_sounds_json", updated.toString()).apply();
+        } catch (Exception ignored) {}
     }
 
     @Override
     protected void onActivityResult(int requestCode, int resultCode, @Nullable Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
 
-        if (requestCode == REQUEST_RINGTONE_PICKER && resultCode == RESULT_OK && data != null) {
+        if (requestCode == REQUEST_AUDIO_FILE_PICKER && resultCode == RESULT_OK && data != null) {
+            Uri uri = data.getData();
+            if (uri != null) {
+                cacheAndSelectAudioFile(uri);
+            }
+        } else if (requestCode == REQUEST_RINGTONE_PICKER && resultCode == RESULT_OK && data != null) {
             Uri uri = data.getParcelableExtra(RingtoneManager.EXTRA_RINGTONE_PICKED_URI);
             if (uri != null) {
                 Ringtone ringtone = RingtoneManager.getRingtone(this, uri);
                 String name = ringtone != null ? ringtone.getTitle(this) : "Selected Sound";
-
-                currentSelectedSoundUri = uri.toString();
-                currentSelectedSoundName = name;
-
-                if (currentDialogSoundTextView != null) {
-                    currentDialogSoundTextView.setText(name);
-                }
-
-                settingsPrefs.edit()
-                        .putString("default_sound_uri", currentSelectedSoundUri)
-                        .putString("default_sound_name", currentSelectedSoundName)
-                        .apply();
-
-                updateSettingsDisplay();
+                applySelectedSound(uri.toString(), name);
             }
         } else if (requestCode == REQUEST_DEVICE_ADMIN) {
             boolean isAdminActive = devicePolicyManager != null && devicePolicyManager.isAdminActive(deviceAdminComponent);

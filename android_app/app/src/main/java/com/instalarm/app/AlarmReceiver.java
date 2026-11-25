@@ -36,24 +36,42 @@ public class AlarmReceiver extends BroadcastReceiver {
             context.startService(serviceIntent);
         }
 
-        // 2. Launch appropriate full-screen activity or native Instagram Reels mission
-        if (dismissTask.startsWith("reels") && isInstagramInstalled(context)) {
+        // 2. Launch first mission in chain (supports up to 3 missions separated by '|')
+        launchNextMission(context, alarmId, label, soundUri, vibrate, snoozeDuration, dismissTask);
+    }
+
+    public static void launchNextMission(Context context, long alarmId, String label,
+                                         String soundUri, boolean vibrate, int snoozeDuration,
+                                         String missionChain) {
+        String firstTask = "none";
+        String remainingChain = "";
+
+        if (missionChain != null && !missionChain.trim().isEmpty()) {
+            String[] parts = missionChain.split("\\|", 2);
+            firstTask = parts[0].trim();
+            if (parts.length > 1) {
+                remainingChain = parts[1].trim();
+            }
+        }
+
+        if (firstTask.startsWith("reels") && isInstagramInstalled(context)) {
             int targetReels = 10;
-            if (dismissTask.contains("_")) {
+            if (firstTask.contains("_")) {
                 try {
-                    targetReels = Integer.parseInt(dismissTask.split("_")[1]);
+                    targetReels = Integer.parseInt(firstTask.split("_")[1]);
                 } catch (Exception ignored) {}
             }
-            InstalarmAccessibilityService.startReelsMission(context, targetReels, alarmId);
+            InstalarmAccessibilityService.startReelsMission(
+                    context, targetReels, alarmId, label, soundUri, vibrate, snoozeDuration, remainingChain);
             return;
         }
 
         Intent fullScreenIntent = new Intent(context, RingingActivity.class);
-
         fullScreenIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
         fullScreenIntent.putExtra("alarm_id", alarmId);
         fullScreenIntent.putExtra("alarm_label", label);
-        fullScreenIntent.putExtra("dismiss_task", dismissTask);
+        fullScreenIntent.putExtra("dismiss_task", firstTask);
+        fullScreenIntent.putExtra("remaining_tasks", remainingChain);
         fullScreenIntent.putExtra("sound_uri", soundUri);
         fullScreenIntent.putExtra("vibrate", vibrate);
         fullScreenIntent.putExtra("snooze_duration", snoozeDuration);
@@ -61,7 +79,7 @@ public class AlarmReceiver extends BroadcastReceiver {
         context.startActivity(fullScreenIntent);
     }
 
-    private boolean isInstagramInstalled(Context context) {
+    private static boolean isInstagramInstalled(Context context) {
         try {
             context.getPackageManager().getPackageInfo("com.instagram.android", 0);
             return true;

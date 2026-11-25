@@ -320,18 +320,21 @@
                             android:textSize="14sp" />
                     </LinearLayout>
 
-                    <!-- Mission Slot Button (+ or Selected Mission) -->
+                    <!-- 3 Mission Slots (Max 3, Alarmy Image 4 style) -->
                     <LinearLayout
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:layout_marginTop="14dp"
                         android:orientation="horizontal"
-                        android:gravity="center_vertical">
+                        android:gravity="start">
 
+                        <!-- Slot 1 -->
                         <com.google.android.material.card.MaterialCardView
-                            android:id="@+id/cardMissionSlot"
-                            android:layout_width="80dp"
+                            android:id="@+id/cardMissionSlot1"
+                            android:layout_width="0dp"
                             android:layout_height="80dp"
+                            android:layout_weight="1"
+                            android:layout_marginEnd="8dp"
                             app:cardBackgroundColor="#1E2330"
                             app:cardCornerRadius="16dp"
                             app:strokeColor="#2D3748"
@@ -345,14 +348,15 @@
                                 android:padding="6dp">
 
                                 <TextView
-                                    android:id="@+id/tvMissionSlotIcon"
+                                    android:id="@+id/tvMissionSlot1Icon"
                                     android:layout_width="wrap_content"
                                     android:layout_height="wrap_content"
                                     android:text="📸"
-                                    android:textSize="24sp" />
+                                    android:textColor="#FFFFFF"
+                                    android:textSize="22sp" />
 
                                 <TextView
-                                    android:id="@+id/tvMissionSlotLabel"
+                                    android:id="@+id/tvMissionSlot1Label"
                                     android:layout_width="wrap_content"
                                     android:layout_height="wrap_content"
                                     android:layout_marginTop="2dp"
@@ -364,15 +368,85 @@
                             </LinearLayout>
                         </com.google.android.material.card.MaterialCardView>
 
-                        <TextView
-                            android:id="@+id/tvMissionSlotHint"
+                        <!-- Slot 2 -->
+                        <com.google.android.material.card.MaterialCardView
+                            android:id="@+id/cardMissionSlot2"
                             android:layout_width="0dp"
-                            android:layout_height="wrap_content"
+                            android:layout_height="80dp"
                             android:layout_weight="1"
-                            android:layout_marginStart="14dp"
-                            android:text="Tap to change mission"
-                            android:textColor="#94A3B8"
-                            android:textSize="13sp" />
+                            android:layout_marginHorizontal="4dp"
+                            app:cardBackgroundColor="#1A1E29"
+                            app:cardCornerRadius="16dp"
+                            app:strokeColor="#252B3B"
+                            app:strokeWidth="1dp">
+
+                            <LinearLayout
+                                android:layout_width="match_parent"
+                                android:layout_height="match_parent"
+                                android:gravity="center"
+                                android:orientation="vertical"
+                                android:padding="6dp">
+
+                                <TextView
+                                    android:id="@+id/tvMissionSlot2Icon"
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:text="+"
+                                    android:textColor="#64748B"
+                                    android:textSize="22sp" />
+
+                                <TextView
+                                    android:id="@+id/tvMissionSlot2Label"
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:layout_marginTop="2dp"
+                                    android:text=""
+                                    android:textColor="#E2E8F0"
+                                    android:textSize="11sp"
+                                    android:gravity="center"
+                                    android:maxLines="1" />
+                            </LinearLayout>
+                        </com.google.android.material.card.MaterialCardView>
+
+                        <!-- Slot 3 -->
+                        <com.google.android.material.card.MaterialCardView
+                            android:id="@+id/cardMissionSlot3"
+                            android:layout_width="0dp"
+                            android:layout_height="80dp"
+                            android:layout_weight="1"
+                            android:layout_marginStart="8dp"
+                            app:cardBackgroundColor="#1A1E29"
+                            app:cardCornerRadius="16dp"
+                            app:strokeColor="#252B3B"
+                            app:strokeWidth="1dp">
+
+                            <LinearLayout
+                                android:layout_width="match_parent"
+                                android:layout_height="match_parent"
+                                android:gravity="center"
+                                android:orientation="vertical"
+                                android:padding="6dp">
+
+                                <TextView
+                                    android:id="@+id/tvMissionSlot3Icon"
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:text="+"
+                                    android:textColor="#64748B"
+                                    android:textSize="22sp" />
+
+                                <TextView
+                                    android:id="@+id/tvMissionSlot3Label"
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:layout_marginTop="2dp"
+                                    android:text=""
+                                    android:textColor="#E2E8F0"
+                                    android:textSize="11sp"
+                                    android:gravity="center"
+                                    android:maxLines="1" />
+                            </LinearLayout>
+                        </com.google.android.material.card.MaterialCardView>
                     </LinearLayout>
 
                     <!-- Prevent power-off row -->

@@ -90,15 +90,25 @@ public class AlarmModel implements Serializable {
     }
 
     public String getTaskDisplayName() {
-        if (dismissTask == null || "none".equalsIgnoreCase(dismissTask)) return "None";
-        if (dismissTask.startsWith("reels")) {
-            String count = "10";
-            if (dismissTask.contains("_")) count = dismissTask.split("_")[1];
-            return "Instagram Reels (" + count + ")";
+        if (dismissTask == null || "none".equalsIgnoreCase(dismissTask) || dismissTask.trim().isEmpty()) return "None";
+        String[] parts = dismissTask.split("\\|");
+        StringBuilder sb = new StringBuilder();
+        for (String part : parts) {
+            String t = part.trim();
+            if (t.isEmpty() || "none".equalsIgnoreCase(t)) continue;
+            if (sb.length() > 0) sb.append(" + ");
+            if (t.startsWith("reels")) {
+                String count = t.contains("_") ? t.split("_")[1] : "10";
+                sb.append("Reels (").append(count).append(")");
+            } else if ("math".equalsIgnoreCase(t)) {
+                sb.append("Math");
+            } else if ("shake".equalsIgnoreCase(t)) {
+                sb.append("Shake");
+            } else {
+                sb.append(t);
+            }
         }
-        if ("math".equalsIgnoreCase(dismissTask)) return "Math (3 problems)";
-        if ("shake".equalsIgnoreCase(dismissTask)) return "Shake phone (20 shakes)";
-        return dismissTask;
+        return sb.length() > 0 ? sb.toString() : "None";
     }
 
     public String getDaysSummary() {

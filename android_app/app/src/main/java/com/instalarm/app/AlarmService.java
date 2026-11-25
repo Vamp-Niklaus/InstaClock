@@ -135,7 +135,13 @@ public class AlarmService extends Service {
             }
 
             mediaPlayer = new MediaPlayer();
-            mediaPlayer.setDataSource(this, alarmUri);
+            try {
+                mediaPlayer.setDataSource(this, alarmUri);
+            } catch (Exception fallbackEx) {
+                Uri defaultUri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM);
+                if (defaultUri == null) defaultUri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_RINGTONE);
+                mediaPlayer.setDataSource(this, defaultUri);
+            }
 
             AudioAttributes audioAttributes = new AudioAttributes.Builder()
                     .setUsage(AudioAttributes.USAGE_ALARM)

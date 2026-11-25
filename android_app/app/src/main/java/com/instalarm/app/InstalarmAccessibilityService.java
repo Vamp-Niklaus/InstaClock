@@ -41,6 +41,11 @@ public class InstalarmAccessibilityService extends AccessibilityService {
     private static volatile int sTargetReels = 10;
     private static volatile int sWatchedReels = 0;
     private static volatile long sCurrentAlarmId = -1;
+    private static volatile String sAlarmLabel = "Alarm";
+    private static volatile String sSoundUri = "";
+    private static volatile boolean sVibrate = true;
+    private static volatile int sSnoozeDuration = 5;
+    private static volatile String sRemainingTasks = "";
     private static volatile long sNextReelAllowedTime = 0;
     private static volatile long sLastCountTime = 0;
 
@@ -120,10 +125,21 @@ public class InstalarmAccessibilityService extends AccessibilityService {
     }
 
     public static void startReelsMission(Context context, int targetReels, long alarmId) {
+        startReelsMission(context, targetReels, alarmId, "Alarm", "", true, 5, "");
+    }
+
+    public static void startReelsMission(Context context, int targetReels, long alarmId,
+                                         String label, String soundUri, boolean vibrate,
+                                         int snoozeDuration, String remainingTasks) {
         sMissionActive = true;
         sTargetReels = targetReels > 0 ? targetReels : 10;
         sWatchedReels = 0;
         sCurrentAlarmId = alarmId;
+        sAlarmLabel = label != null ? label : "Alarm";
+        sSoundUri = soundUri != null ? soundUri : "";
+        sVibrate = vibrate;
+        sSnoozeDuration = snoozeDuration > 0 ? snoozeDuration : 5;
+        sRemainingTasks = remainingTasks != null ? remainingTasks : "";
         sLastCountTime = 0;
         sNextReelAllowedTime = System.currentTimeMillis() + 5000L;
 
@@ -418,6 +434,30 @@ public class InstalarmAccessibilityService extends AccessibilityService {
     private void completeMission() {
         sMissionActive = false;
         if (countdownTimer != null) countdownTimer.cancel();
+
+        // Check if there are remaining missions in the chain
+        if (sRemainingTasks != null && !sRemainingTasks.trim().isEmpty()) {
+            final String nextChain = sRemainingTasks.trim();
+            sRemainingTasks = "";
+            if (tvOverlayStatus != null) {
+                tvOverlayStatus.setText("✅ Reels done! Next mission...");
+                tvOverlayStatus.setTextColor(Color.parseColor("#00E676"));
+            }
+            AlarmService.unmuteSoundAndVibration();
+            new Handler(Looper.getMainLooper()).postDelayed(() -> {
+                hideOverlay();
+                AlarmReceiver.launchNextMission(
+                        getApplicationContext(),
+                        sCurrentAlarmId,
+                        sAlarmLabel,
+                        sSoundUri,
+                        sVibrate,
+                        sSnoozeDuration,
+                        nextChain
+                );
+            }, 900);
+            return;
+        }
 
         // Stop alarm sound and vibration completely
         AlarmService.stopAlarm(getApplicationContext());
