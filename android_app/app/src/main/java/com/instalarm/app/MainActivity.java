@@ -376,7 +376,7 @@ public class MainActivity extends AppCompatActivity implements AlarmsAdapter.OnA
             });
         }
 
-        // Test Native App Mission (inside Developer section)
+        // Test Native App Mission (inside Developer section - starts real alarm sound + HUD)
         findViewById(R.id.btnTestReelsMission).setOnClickListener(v -> {
             if (!isInstagramInstalled()) {
                 Toast.makeText(this, "Instagram is not installed", Toast.LENGTH_SHORT).show();
@@ -387,8 +387,18 @@ public class MainActivity extends AppCompatActivity implements AlarmsAdapter.OnA
                 requestPreventPowerOffActivation();
                 return;
             }
-            Toast.makeText(this, "Launching Instagram Reels Mission...", Toast.LENGTH_SHORT).show();
-            InstalarmAccessibilityService.startReelsMission(this, 5, -1);
+            String soundUri = settingsPrefs.getString("default_sound_uri", "");
+            Intent serviceIntent = new Intent(this, AlarmService.class);
+            serviceIntent.putExtra("alarm_id", -1L);
+            serviceIntent.putExtra("alarm_label", "Test Mission");
+            serviceIntent.putExtra("sound_uri", soundUri);
+            serviceIntent.putExtra("vibrate", true);
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                startForegroundService(serviceIntent);
+            } else {
+                startService(serviceIntent);
+            }
+            AlarmReceiver.launchNextMission(this, -1L, "Test Mission", soundUri, true, 5, "reels_5");
         });
 
         updateSettingsDisplay();
@@ -1444,9 +1454,18 @@ public class MainActivity extends AppCompatActivity implements AlarmsAdapter.OnA
                 }
             }
 
+            String ext = ".mp3";
+            int dot = displayName.lastIndexOf('.');
+            if (dot >= 0 && dot < displayName.length() - 1) {
+                String candidate = displayName.substring(dot).replaceAll("[^a-zA-Z0-9.]", "");
+                if (candidate.length() >= 2 && candidate.length() <= 6) {
+                    ext = candidate;
+                }
+            }
+
             java.io.File soundsDir = new java.io.File(getFilesDir(), "sounds");
             if (!soundsDir.exists()) soundsDir.mkdirs();
-            java.io.File destFile = new java.io.File(soundsDir, "alarm_" + System.currentTimeMillis() + ".audio");
+            java.io.File destFile = new java.io.File(soundsDir, "alarm_" + System.currentTimeMillis() + ext);
 
             try (java.io.InputStream in = getContentResolver().openInputStream(sourceUri);
                  java.io.OutputStream out = new java.io.FileOutputStream(destFile)) {

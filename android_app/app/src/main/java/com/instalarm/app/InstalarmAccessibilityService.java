@@ -23,6 +23,7 @@ import android.view.View;
 import android.view.WindowManager;
 import android.view.accessibility.AccessibilityEvent;
 import android.view.accessibility.AccessibilityNodeInfo;
+import android.view.accessibility.AccessibilityWindowInfo;
 import android.widget.ProgressBar;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -189,24 +190,56 @@ public class InstalarmAccessibilityService extends AccessibilityService {
         @Override
         public void run() {
             if (!sMissionActive) return;
-            AudioManager am = (AudioManager) getSystemService(Context.AUDIO_SERVICE);
-            boolean musicPlaying = am != null && am.isMusicActive();
-            if (isInInstagram && musicPlaying) {
-                lastReelAudioActiveTime = System.currentTimeMillis();
-                AlarmService.muteSoundAndVibration();
-            } else if (!isInInstagram) {
-                AlarmService.unmuteSoundAndVibration();
-            } else if (System.currentTimeMillis() - lastReelAudioActiveTime > 1500) {
-                AlarmService.unmuteSoundAndVibration();
-            }
-            audioMonitorHandler.postDelayed(this, 500);
+            evaluateInstagramVsAlarmAudio();
+            audioMonitorHandler.postDelayed(this, 350);
         }
     };
+
+    private void evaluateInstagramVsAlarmAudio() {
+        AudioManager am = (AudioManager) getSystemService(Context.AUDIO_SERVICE);
+        int mediaVol = am != null ? am.getStreamVolume(AudioManager.STREAM_MUSIC) : 0;
+        boolean musicPlaying = am != null && am.isMusicActive();
+
+        AccessibilityNodeInfo activeRoot = getRootInActiveWindow();
+        String activePkg = (activeRoot != null && activeRoot.getPackageName() != null)
+                ? activeRoot.getPackageName().toString().toLowerCase(Locale.US)
+                : "";
+        boolean foregroundInsta = "com.instagram.android".equals(activePkg)
+                || (isInInstagram && (activePkg.isEmpty() || activePkg.contains("inputmethod")));
+
+        boolean uiMuted = foregroundInsta && isInstagramUiMuted(activeRoot);
+        boolean instagramAudible = foregroundInsta && mediaVol > 0 && musicPlaying && !uiMuted;
+
+        if (instagramAudible) {
+            lastReelAudioActiveTime = System.currentTimeMillis();
+            AlarmService.muteSoundAndVibration();
+        } else if (!foregroundInsta || mediaVol <= 0 || uiMuted) {
+            AlarmService.unmuteSoundAndVibration();
+        } else if (System.currentTimeMillis() - lastReelAudioActiveTime > 700) {
+            AlarmService.unmuteSoundAndVibration();
+        }
+    }
+
+    private boolean isInstagramUiMuted(AccessibilityNodeInfo root) {
+        if (root == null) return false;
+        String[] muteLabels = new String[]{
+                "Sound is off", "Sound off", "Turn on sound", "Turn sound on",
+                "Audio is muted", "Video has no sound", "Tap to turn on audio"
+        };
+        for (String label : muteLabels) {
+            List<AccessibilityNodeInfo> nodes = root.findAccessibilityNodeInfosByText(label);
+            if (nodes != null && !nodes.isEmpty()) {
+                return true;
+            }
+        }
+        return false;
+    }
 
     private void startAudioMonitor() {
         lastReelAudioActiveTime = 0;
         audioMonitorHandler.removeCallbacks(audioMonitorRunnable);
-        audioMonitorHandler.postDelayed(audioMonitorRunnable, 500);
+        evaluateInstagramVsAlarmAudio();
+        audioMonitorHandler.postDelayed(audioMonitorRunnable, 350);
     }
 
     @Override
@@ -224,6 +257,7 @@ public class InstalarmAccessibilityService extends AccessibilityService {
         Log.d(TAG, "InstalarmAccessibilityService connected and ready.");
         if (sMissionActive) {
             showOverlay();
+            startAudioMonitor();
             startCountdownTicker();
         }
     }
@@ -247,9 +281,9 @@ public class InstalarmAccessibilityService extends AccessibilityService {
             handleInstagramUsageAndLock(eventType, pkg);
         }
 
-        // 2. DETECT POWER-OFF / SHUTDOWN DIALOGS (including Samsung One UI GlobalActions)
+        // 2. DETECT POWER-OFF / SHUTDOWN DIALOGS (Samsung One UI & stock Android)
         boolean preventPowerOff = prefs.getBoolean("prevent_power_off", false);
-        if (preventPowerOff) {
+        if (preventPowerOff && !"com.android.settings".equals(pkg)) {
             boolean isPowerMenu = pkg.contains("globalactions") ||
                                   cls.contains("globalactions") ||
                                   cls.contains("powerdialog") ||
@@ -257,21 +291,29 @@ public class InstalarmAccessibilityService extends AccessibilityService {
                                   cls.contains("poweroff") ||
                                   (pkg.contains("systemui") && cls.contains("actionsdialog"));
 
-            if (!isPowerMenu && eventType == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED
-                    && (pkg.contains("systemui") || pkg.contains("samsung"))) {
-                AccessibilityNodeInfo root = getRootInActiveWindow();
-                if (root != null) {
-                    List<AccessibilityNodeInfo> powerNodes = root.findAccessibilityNodeInfosByText("Power off");
-                    List<AccessibilityNodeInfo> restartNodes = root.findAccessibilityNodeInfosByText("Restart");
-                    if (powerNodes != null && !powerNodes.isEmpty() && restartNodes != null && !restartNodes.isEmpty()) {
-                        isPowerMenu = true;
+            if (!isPowerMenu && (eventType == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED
+                    || eventType == AccessibilityEvent.TYPE_WINDOWS_CHANGED
+                    || (eventType == AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED
+                    && (pkg.contains("systemui") || pkg.contains("samsung") || "android".equals(pkg))))) {
+                if (hasPowerMenuInWindow(getRootInActiveWindow())) {
+                    isPowerMenu = true;
+                } else {
+                    List<AccessibilityWindowInfo> windows = getWindows();
+                    if (windows != null) {
+                        for (AccessibilityWindowInfo w : windows) {
+                            if (w != null && hasPowerMenuInWindow(w.getRoot())) {
+                                isPowerMenu = true;
+                                break;
+                            }
+                        }
                     }
                 }
             }
 
             if (isPowerMenu) {
                 performGlobalAction(GLOBAL_ACTION_BACK);
-                performGlobalAction(GLOBAL_ACTION_HOME);
+                new Handler(Looper.getMainLooper()).postDelayed(() ->
+                        performGlobalAction(GLOBAL_ACTION_BACK), 150);
                 notifyBlockAction("Power-off action blocked by InstaClock!");
 
                 int blocks = prefs.getInt("power_off_block_count", 0) + 1;
@@ -310,6 +352,19 @@ public class InstalarmAccessibilityService extends AccessibilityService {
         }
     }
 
+    private boolean hasPowerMenuInWindow(AccessibilityNodeInfo root) {
+        if (root == null) return false;
+        String rootPkg = root.getPackageName() != null ? root.getPackageName().toString().toLowerCase(Locale.US) : "";
+        if ("com.android.settings".equals(rootPkg) || "com.instalarm.app".equals(rootPkg)) return false;
+
+        List<AccessibilityNodeInfo> powerNodes = root.findAccessibilityNodeInfosByText("Power off");
+        List<AccessibilityNodeInfo> restartNodes = root.findAccessibilityNodeInfosByText("Restart");
+        List<AccessibilityNodeInfo> sideBtnNodes = root.findAccessibilityNodeInfosByText("Side button settings");
+        boolean hasPowerAndRestart = powerNodes != null && !powerNodes.isEmpty() && restartNodes != null && !restartNodes.isEmpty();
+        boolean hasSideBtnAndPower = powerNodes != null && !powerNodes.isEmpty() && sideBtnNodes != null && !sideBtnNodes.isEmpty();
+        return hasPowerAndRestart || hasSideBtnAndPower;
+    }
+
     private void handleInstagramUsageAndLock(int eventType, String pkg) {
         if (pkg.equals("com.instagram.android")) {
             int usedSeconds = getTodayUsageSeconds(prefs);
@@ -335,8 +390,8 @@ public class InstalarmAccessibilityService extends AccessibilityService {
 
     private synchronized void handleReelsMissionEvent(int eventType, String pkg) {
         // App switch detection
-        if (eventType == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) {
-            if (!pkg.contains("instagram") && !pkg.contains("instalarm")) {
+        if (eventType == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED || eventType == AccessibilityEvent.TYPE_WINDOWS_CHANGED) {
+            if (!"com.instagram.android".equals(pkg) && !pkg.contains("inputmethod") && !pkg.isEmpty()) {
                 isInInstagram = false;
                 // User navigated away from Instagram! Unmute alarm loudly
                 AlarmService.unmuteSoundAndVibration();
@@ -346,8 +401,9 @@ public class InstalarmAccessibilityService extends AccessibilityService {
                         tvOverlayStatus.setTextColor(Color.parseColor("#FF5252"));
                     }
                 });
-            } else if (pkg.contains("instagram")) {
+            } else if ("com.instagram.android".equals(pkg)) {
                 isInInstagram = true;
+                evaluateInstagramVsAlarmAudio();
             }
         }
 

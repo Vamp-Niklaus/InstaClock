@@ -157,8 +157,11 @@ public class RingingActivity extends AppCompatActivity implements SensorEventLis
     }
 
     private void startAlarmAudioAndVibration() {
+        if (AlarmService.isAlarmRunning() && AlarmService.getCurrentAlarmId() == alarmId) {
+            return;
+        }
         Intent serviceIntent = new Intent(this, AlarmService.class);
-        serviceIntent.putExtra("alarm_id", (int) alarmId);
+        serviceIntent.putExtra("alarm_id", alarmId);
         serviceIntent.putExtra("alarm_label", label);
         serviceIntent.putExtra("sound_uri", soundUri);
         serviceIntent.putExtra("vibrate", vibrate);

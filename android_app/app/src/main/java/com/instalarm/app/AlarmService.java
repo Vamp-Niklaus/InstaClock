@@ -37,6 +37,7 @@ public class AlarmService extends Service {
     private PowerManager.WakeLock wakeLock;
     private AudioManager audioManager;
     private int lockedAlarmVolume = -1;
+    private long activeAlarmId = Long.MIN_VALUE;
     private boolean isMuted = false;
 
     private final Handler volumeGuardHandler = new Handler(Looper.getMainLooper());
@@ -55,33 +56,43 @@ public class AlarmService extends Service {
         }
     };
 
+    public static long getCurrentAlarmId() {
+        return activeInstance != null ? activeInstance.activeAlarmId : Long.MIN_VALUE;
+    }
+
     public static boolean isAlarmRunning() {
         return activeInstance != null;
     }
 
     public static void muteSoundAndVibration() {
-        if (activeInstance != null) {
+        if (activeInstance != null && !activeInstance.isMuted) {
             activeInstance.isMuted = true;
             if (activeInstance.mediaPlayer != null) {
                 try {
-                    activeInstance.mediaPlayer.setVolume(0.0f, 0.0f);
+                    if (activeInstance.mediaPlayer.isPlaying()) {
+                        activeInstance.mediaPlayer.pause();
+                    }
                 } catch (Exception ignored) {}
             }
             activeInstance.stopVibration();
-            Log.d(TAG, "Muted alarm sound & vibration for video playback");
+            Log.d(TAG, "Paused alarm sound & vibration for Instagram audio");
         }
     }
 
     public static void unmuteSoundAndVibration() {
-        if (activeInstance != null) {
+        if (activeInstance != null && activeInstance.isMuted) {
             activeInstance.isMuted = false;
+            activeInstance.enforceConfiguredAlarmVolume();
             if (activeInstance.mediaPlayer != null) {
                 try {
+                    if (!activeInstance.mediaPlayer.isPlaying()) {
+                        activeInstance.mediaPlayer.start();
+                    }
                     activeInstance.mediaPlayer.setVolume(1.0f, 1.0f);
                 } catch (Exception ignored) {}
             }
             activeInstance.startVibration();
-            Log.d(TAG, "Unmuted alarm sound & vibration");
+            Log.d(TAG, "Resumed alarm sound & vibration");
         }
     }
 
@@ -144,31 +155,43 @@ public class AlarmService extends Service {
             vibrate = intent.getBooleanExtra("vibrate", true);
         }
 
+        boolean alreadyPlayingSame = mediaPlayer != null && activeAlarmId == alarmId && (mediaPlayer.isPlaying() || isMuted);
+        activeAlarmId = alarmId;
         startForeground(NOTIFICATION_ID, buildForegroundNotification(alarmId, label));
-        startAlarmAudio(soundUri);
 
-        if (vibrate) {
-            startVibration();
+        if (!alreadyPlayingSame) {
+            isMuted = false;
+            enforceConfiguredAlarmVolume();
+            startAlarmAudio(soundUri);
+            if (vibrate) {
+                startVibration();
+            }
         }
 
         return START_STICKY;
     }
 
+    private boolean trySetDataSource(MediaPlayer mp, Uri uri) {
+        if (uri == null) return false;
+        try {
+            if ("file".equals(uri.getScheme()) && uri.getPath() != null) {
+                java.io.File file = new java.io.File(uri.getPath());
+                if (!file.exists()) return false;
+                try (java.io.FileInputStream fis = new java.io.FileInputStream(file)) {
+                    mp.setDataSource(fis.getFD());
+                }
+                return true;
+            }
+            mp.setDataSource(this, uri);
+            return true;
+        } catch (Exception e) {
+            Log.w(TAG, "Could not load sound URI " + uri + ": " + e.getMessage());
+            return false;
+        }
+    }
+
     private void startAlarmAudio(String customSoundUri) {
         try {
-            Uri alarmUri = null;
-            if (customSoundUri != null && !customSoundUri.trim().isEmpty()) {
-                try {
-                    alarmUri = Uri.parse(customSoundUri);
-                } catch (Exception ignored) {}
-            }
-            if (alarmUri == null) {
-                alarmUri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM);
-            }
-            if (alarmUri == null) {
-                alarmUri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_RINGTONE);
-            }
-
             if (mediaPlayer != null) {
                 try {
                     mediaPlayer.release();
@@ -176,19 +199,25 @@ public class AlarmService extends Service {
             }
 
             mediaPlayer = new MediaPlayer();
-            try {
-                if (alarmUri != null && "file".equals(alarmUri.getScheme()) && alarmUri.getPath() != null) {
-                    java.io.FileInputStream fis = new java.io.FileInputStream(alarmUri.getPath());
-                    mediaPlayer.setDataSource(fis.getFD());
-                    fis.close();
-                } else {
-                    mediaPlayer.setDataSource(this, alarmUri);
-                }
-            } catch (Exception fallbackEx) {
-                Uri defaultUri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM);
-                if (defaultUri == null) defaultUri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_RINGTONE);
-                mediaPlayer.setDataSource(this, defaultUri);
+            boolean loaded = false;
+
+            if (customSoundUri != null && !customSoundUri.trim().isEmpty()) {
+                loaded = trySetDataSource(mediaPlayer, Uri.parse(customSoundUri));
             }
+            if (!loaded) {
+                SharedPreferences prefs = getSharedPreferences("alarm_settings", MODE_PRIVATE);
+                String defaultCustomUri = prefs.getString("default_sound_uri", "");
+                if (!defaultCustomUri.trim().isEmpty()) {
+                    loaded = trySetDataSource(mediaPlayer, Uri.parse(defaultCustomUri));
+                }
+            }
+            if (!loaded) {
+                Uri sysDefault = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM);
+                if (sysDefault == null) sysDefault = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_RINGTONE);
+                loaded = trySetDataSource(mediaPlayer, sysDefault);
+            }
+
+            if (!loaded) return;
 
             AudioAttributes audioAttributes = new AudioAttributes.Builder()
                     .setUsage(AudioAttributes.USAGE_ALARM)
@@ -196,7 +225,6 @@ public class AlarmService extends Service {
                     .build();
 
             mediaPlayer.setAudioAttributes(audioAttributes);
-            mediaPlayer.setAudioStreamType(AudioManager.STREAM_ALARM);
             mediaPlayer.setLooping(true);
             mediaPlayer.prepare();
             mediaPlayer.start();

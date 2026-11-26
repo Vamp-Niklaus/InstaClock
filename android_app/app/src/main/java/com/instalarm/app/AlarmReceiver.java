@@ -14,12 +14,23 @@ public class AlarmReceiver extends BroadcastReceiver {
     public void onReceive(Context context, Intent intent) {
         long alarmId = intent.getLongExtra("alarm_id", 0);
         String label = intent.getStringExtra("alarm_label");
-        if (label == null || label.trim().isEmpty()) label = "Alarm";
         String dismissTask = intent.getStringExtra("dismiss_task");
-        if (dismissTask == null) dismissTask = "reels_10";
         String soundUri = intent.getStringExtra("sound_uri");
         boolean vibrate = intent.getBooleanExtra("vibrate", true);
         int snoozeDuration = intent.getIntExtra("snooze_duration", 5);
+
+        if (alarmId > 0) {
+            AlarmModel dbAlarm = AlarmDatabase.getInstance(context).getAlarmById(alarmId);
+            if (dbAlarm != null) {
+                label = dbAlarm.getLabel();
+                dismissTask = dbAlarm.getDismissTask();
+                soundUri = dbAlarm.getSoundUri();
+                vibrate = dbAlarm.isVibrate();
+                snoozeDuration = dbAlarm.getSnoozeDuration();
+            }
+        }
+        if (label == null || label.trim().isEmpty()) label = "Alarm";
+        if (dismissTask == null) dismissTask = "reels_10";
 
         Log.d(TAG, "Alarm triggered! id=" + alarmId + ", task=" + dismissTask);
 
