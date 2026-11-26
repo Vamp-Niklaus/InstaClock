@@ -189,6 +189,7 @@ public class InstalarmAccessibilityService extends AccessibilityService {
     private final Handler audioMonitorHandler = new Handler(Looper.getMainLooper());
     private long audioStopTimestamp = 0;
     private long currentSilenceWaitMs = 5000L;
+    private volatile boolean sInstagramUiMarkedMuted = false;
     private final Runnable audioMonitorRunnable = new Runnable() {
         @Override
         public void run() {
@@ -198,11 +199,78 @@ public class InstalarmAccessibilityService extends AccessibilityService {
         }
     };
 
+    private boolean isMediaStreamMutedOrZero(AudioManager am) {
+        if (am == null) return true;
+        if (am.getStreamVolume(AudioManager.STREAM_MUSIC) <= 0) return true;
+        if (am.isStreamMute(AudioManager.STREAM_MUSIC)) return true;
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            try {
+                AudioAttributes mediaAttrs = new AudioAttributes.Builder()
+                        .setUsage(AudioAttributes.USAGE_MEDIA)
+                        .setContentType(AudioAttributes.CONTENT_TYPE_MOVIE)
+                        .build();
+                int groupId = am.getVolumeGroupIdForAttributes(mediaAttrs);
+                if (groupId >= 0 && am.isVolumeGroupMuted(groupId)) {
+                    return true;
+                }
+            } catch (Exception ignored) {}
+        }
+        return false;
+    }
+
+    private void refreshInstagramUiMuteState() {
+        List<AccessibilityWindowInfo> windows = getWindows();
+        if (windows == null) return;
+        for (AccessibilityWindowInfo w : windows) {
+            if (w == null) continue;
+            AccessibilityNodeInfo root = w.getRoot();
+            if (root == null || root.getPackageName() == null) continue;
+            if (!"com.instagram.android".equalsIgnoreCase(root.getPackageName().toString())) continue;
+
+            Boolean detected = detectVisibleMuteState(root);
+            if (detected != null) {
+                sInstagramUiMarkedMuted = detected;
+            }
+            return;
+        }
+    }
+
+    private Boolean detectVisibleMuteState(AccessibilityNodeInfo root) {
+        String[] unmutedLabels = new String[]{
+                "Sound is on", "Sound on", "Turn off sound", "Turn sound off", "Tap to mute"
+        };
+        for (String label : unmutedLabels) {
+            List<AccessibilityNodeInfo> nodes = root.findAccessibilityNodeInfosByText(label);
+            if (nodes != null) {
+                for (AccessibilityNodeInfo n : nodes) {
+                    if (n != null && n.isVisibleToUser()) {
+                        return Boolean.FALSE;
+                    }
+                }
+            }
+        }
+        String[] mutedLabels = new String[]{
+                "Sound is off", "Sound off", "Audio is muted", "Turn on sound",
+                "Turn sound on", "Audio off", "Video has no sound", "Tap to unmute", "Unmute"
+        };
+        for (String label : mutedLabels) {
+            List<AccessibilityNodeInfo> nodes = root.findAccessibilityNodeInfosByText(label);
+            if (nodes != null) {
+                for (AccessibilityNodeInfo n : nodes) {
+                    if (n != null && n.isVisibleToUser()) {
+                        return Boolean.TRUE;
+                    }
+                }
+            }
+        }
+        return null;
+    }
+
     private void evaluateInstagramVsAlarmAudio() {
         AudioManager am = (AudioManager) getSystemService(Context.AUDIO_SERVICE);
         if (am == null) return;
 
-        int mediaVol = am.getStreamVolume(AudioManager.STREAM_MUSIC);
+        boolean mutedOrZero = isMediaStreamMutedOrZero(am);
         boolean mediaActive = am.isMusicActive();
         if (!mediaActive && Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             for (AudioPlaybackConfiguration cfg : am.getActivePlaybackConfigurations()) {
@@ -213,11 +281,12 @@ public class InstalarmAccessibilityService extends AccessibilityService {
             }
         }
 
-        boolean mediaChannelPlaying = mediaVol > 0 && mediaActive;
+        refreshInstagramUiMuteState();
+        boolean mediaChannelPlaying = !mutedOrZero && mediaActive && !sInstagramUiMarkedMuted;
         long now = System.currentTimeMillis();
 
         if (mediaChannelPlaying) {
-            // Media channel is actively producing sound: mute alarm immediately
+            // Media channel is actively producing audible sound: mute alarm immediately
             AlarmService.muteSoundAndVibration();
             if (audioStopTimestamp > 0) {
                 // Sound returned before grace window expired: reset timer to 2s for next pause
@@ -225,7 +294,7 @@ public class InstalarmAccessibilityService extends AccessibilityService {
                 currentSilenceWaitMs = 2000L;
             }
         } else {
-            // Media channel is silent or volume is 0: wait 5s (or 2s after quick reset) before ringing
+            // Media channel is silent, muted, or volume is 0: wait 5s (or 2s after reset) before ringing
             if (audioStopTimestamp == 0) {
                 audioStopTimestamp = now;
             } else if (now - audioStopTimestamp >= currentSilenceWaitMs) {
@@ -237,6 +306,7 @@ public class InstalarmAccessibilityService extends AccessibilityService {
     private void startAudioMonitor() {
         audioStopTimestamp = 0;
         currentSilenceWaitMs = 5000L;
+        sInstagramUiMarkedMuted = false;
         audioMonitorHandler.removeCallbacks(audioMonitorRunnable);
         evaluateInstagramVsAlarmAudio();
         audioMonitorHandler.postDelayed(audioMonitorRunnable, 300);
@@ -425,7 +495,12 @@ public class InstalarmAccessibilityService extends AccessibilityService {
             }
         }
 
-        // Scroll event detection in Instagram
+        // Scroll / Click events in Instagram
+        if (eventType == AccessibilityEvent.TYPE_VIEW_CLICKED && "com.instagram.android".equals(pkg)) {
+            new Handler(Looper.getMainLooper()).postDelayed(this::refreshInstagramUiMuteState, 150);
+            new Handler(Looper.getMainLooper()).postDelayed(this::refreshInstagramUiMuteState, 400);
+        }
+
         if (eventType == AccessibilityEvent.TYPE_VIEW_SCROLLED && pkg.contains("instagram")) {
             long now = System.currentTimeMillis();
             if (now >= sNextReelAllowedTime) {
