@@ -169,7 +169,40 @@
                 android:progressTint="#2196F3" />
         </LinearLayout>
 
-        <!-- 3. Task Completed Confirmation -->
+        <!-- 3. Instagram Reels Mission Prompt -->
+        <LinearLayout
+            android:id="@+id/layoutReelsTask"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:gravity="center"
+            android:padding="16dp"
+            android:visibility="gone">
+
+            <TextView
+                android:id="@+id/tvReelsTaskTitle"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Watch 10 Instagram Reels to dismiss"
+                android:textColor="#E2E8F0"
+                android:textSize="16sp"
+                android:gravity="center" />
+
+            <Button
+                android:id="@+id/btnOpenInstagramMission"
+                android:layout_width="match_parent"
+                android:layout_height="54dp"
+                android:layout_marginTop="16dp"
+                android:text="Open Instagram"
+                android:textAllCaps="false"
+                android:textColor="#FFFFFF"
+                android:textSize="16sp"
+                android:textStyle="bold"
+                android:backgroundTint="#E1306C"
+                app:cornerRadius="16dp" />
+        </LinearLayout>
+
+        <!-- 4. Task Completed Confirmation -->
         <LinearLayout
             android:id="@+id/layoutTaskCompleted"
             android:layout_width="match_parent"

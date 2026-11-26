@@ -7,13 +7,16 @@ import android.app.PendingIntent;
 import android.app.Service;
 import android.content.Context;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.media.AudioAttributes;
 import android.media.AudioManager;
 import android.media.MediaPlayer;
 import android.media.RingtoneManager;
 import android.net.Uri;
 import android.os.Build;
+import android.os.Handler;
 import android.os.IBinder;
+import android.os.Looper;
 import android.os.PowerManager;
 import android.os.VibrationEffect;
 import android.os.Vibrator;
@@ -32,7 +35,25 @@ public class AlarmService extends Service {
     private MediaPlayer mediaPlayer;
     private Vibrator vibrator;
     private PowerManager.WakeLock wakeLock;
+    private AudioManager audioManager;
+    private int lockedAlarmVolume = -1;
     private boolean isMuted = false;
+
+    private final Handler volumeGuardHandler = new Handler(Looper.getMainLooper());
+    private final Runnable volumeGuardRunnable = new Runnable() {
+        @Override
+        public void run() {
+            if (activeInstance != null && !isMuted && audioManager != null && lockedAlarmVolume > 0) {
+                try {
+                    int current = audioManager.getStreamVolume(AudioManager.STREAM_ALARM);
+                    if (current != lockedAlarmVolume) {
+                        audioManager.setStreamVolume(AudioManager.STREAM_ALARM, lockedAlarmVolume, 0);
+                    }
+                } catch (Exception ignored) {}
+            }
+            volumeGuardHandler.postDelayed(this, 500);
+        }
+    };
 
     public static boolean isAlarmRunning() {
         return activeInstance != null;
@@ -85,7 +106,27 @@ public class AlarmService extends Service {
         }
 
         vibrator = (Vibrator) getSystemService(Context.VIBRATOR_SERVICE);
+        audioManager = (AudioManager) getSystemService(Context.AUDIO_SERVICE);
+        enforceConfiguredAlarmVolume();
+        volumeGuardHandler.postDelayed(volumeGuardRunnable, 500);
         createNotificationChannel();
+    }
+
+    private void enforceConfiguredAlarmVolume() {
+        if (audioManager == null) return;
+        try {
+            SharedPreferences prefs = getSharedPreferences("alarm_settings", MODE_PRIVATE);
+            int percent = prefs.getInt("alarm_volume_percent", 80);
+            if (percent < 40) percent = 40;
+            if (percent > 100) percent = 100;
+
+            int maxVol = audioManager.getStreamMaxVolume(AudioManager.STREAM_ALARM);
+            int minAllowed = (int) Math.ceil(maxVol * 0.40);
+            lockedAlarmVolume = Math.max(minAllowed, Math.round(maxVol * (percent / 100.0f)));
+            audioManager.setStreamVolume(AudioManager.STREAM_ALARM, lockedAlarmVolume, 0);
+        } catch (Exception e) {
+            Log.e(TAG, "Failed to lock alarm volume: " + e.getMessage());
+        }
     }
 
     @Override
@@ -136,7 +177,13 @@ public class AlarmService extends Service {
 
             mediaPlayer = new MediaPlayer();
             try {
-                mediaPlayer.setDataSource(this, alarmUri);
+                if (alarmUri != null && "file".equals(alarmUri.getScheme()) && alarmUri.getPath() != null) {
+                    java.io.FileInputStream fis = new java.io.FileInputStream(alarmUri.getPath());
+                    mediaPlayer.setDataSource(fis.getFD());
+                    fis.close();
+                } else {
+                    mediaPlayer.setDataSource(this, alarmUri);
+                }
             } catch (Exception fallbackEx) {
                 Uri defaultUri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM);
                 if (defaultUri == null) defaultUri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_RINGTONE);
@@ -195,7 +242,7 @@ public class AlarmService extends Service {
 
         return new NotificationCompat.Builder(this, CHANNEL_ID)
             .setSmallIcon(android.R.drawable.ic_lock_idle_alarm)
-            .setContentTitle("Instalarm: " + label)
+            .setContentTitle("InstaClock: " + label)
             .setContentText("Alarm is ringing! Complete mission to dismiss.")
             .setPriority(NotificationCompat.PRIORITY_MAX)
             .setCategory(NotificationCompat.CATEGORY_ALARM)
@@ -228,6 +275,7 @@ public class AlarmService extends Service {
     @Override
     public void onDestroy() {
         super.onDestroy();
+        volumeGuardHandler.removeCallbacks(volumeGuardRunnable);
         activeInstance = null;
 
         if (mediaPlayer != null) {

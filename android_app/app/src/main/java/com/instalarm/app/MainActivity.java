@@ -11,6 +11,8 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
+import android.media.AudioAttributes;
+import android.media.MediaPlayer;
 import android.media.Ringtone;
 import android.media.RingtoneManager;
 import android.net.Uri;
@@ -23,6 +25,7 @@ import android.widget.CheckBox;
 import android.widget.EditText;
 import android.widget.LinearLayout;
 import android.widget.NumberPicker;
+import android.widget.SeekBar;
 import android.widget.TextView;
 import android.widget.TimePicker;
 import android.widget.Toast;
@@ -102,10 +105,12 @@ public class MainActivity extends AppCompatActivity implements AlarmsAdapter.OnA
     private ComponentName deviceAdminComponent;
     private DevicePolicyManager devicePolicyManager;
 
-    // State for sound picker in dialog
+    // State for sound picker & preview
     private TextView currentDialogSoundTextView;
     private String currentSelectedSoundUri = "";
     private String currentSelectedSoundName = "Default alarm";
+    private MediaPlayer previewPlayer;
+    private TextView activePreviewButton;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -139,6 +144,12 @@ public class MainActivity extends AppCompatActivity implements AlarmsAdapter.OnA
         updateSettingsDisplay();
         loadAlarms();
         checkVictoryCelebration(getIntent());
+    }
+
+    @Override
+    protected void onPause() {
+        super.onPause();
+        stopSoundPreview();
     }
 
     private void checkVictoryCelebration(Intent intent) {
@@ -316,6 +327,33 @@ public class MainActivity extends AppCompatActivity implements AlarmsAdapter.OnA
             currentDialogSoundTextView = null;
             openRingtonePicker(null);
         });
+        View btnPreviewDefault = findViewById(R.id.btnPreviewDefaultSound);
+        if (btnPreviewDefault instanceof TextView) {
+            btnPreviewDefault.setOnClickListener(v -> {
+                String uri = settingsPrefs.getString("default_sound_uri", "");
+                toggleSoundPreview(uri, (TextView) btnPreviewDefault);
+            });
+        }
+
+        SeekBar seekBarVolume = findViewById(R.id.seekBarAlarmVolume);
+        TextView tvSettingVolumeValue = findViewById(R.id.tvSettingVolumeValue);
+        if (seekBarVolume != null && tvSettingVolumeValue != null) {
+            int savedVol = Math.max(40, Math.min(100, settingsPrefs.getInt("alarm_volume_percent", 80)));
+            seekBarVolume.setProgress(savedVol - 40);
+            tvSettingVolumeValue.setText(savedVol + "%");
+            seekBarVolume.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+                @Override
+                public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
+                    int pct = 40 + progress;
+                    tvSettingVolumeValue.setText(pct + "%");
+                    if (fromUser) {
+                        settingsPrefs.edit().putInt("alarm_volume_percent", pct).apply();
+                    }
+                }
+                @Override public void onStartTrackingTouch(SeekBar seekBar) {}
+                @Override public void onStopTrackingTouch(SeekBar seekBar) {}
+            });
+        }
         findViewById(R.id.rowSettingExactAlarm).setOnClickListener(v -> openExactAlarmSettings());
 
         View rowAppUpdate = findViewById(R.id.rowSettingAppUpdate);
@@ -429,15 +467,15 @@ public class MainActivity extends AppCompatActivity implements AlarmsAdapter.OnA
         if (!isAccessibilityEnabled) {
             new AlertDialog.Builder(this)
                     .setTitle("Accessibility Permission")
-                    .setMessage("To detect when the power-off or shutdown menu is opened, please enable 'Instalarm' in Accessibility Settings.")
+                    .setMessage("To detect when the power-off or shutdown menu is opened, please enable 'InstaClock' in Accessibility Settings.")
                     .setPositiveButton("Open Settings", (dialog, which) -> {
                         Intent intent = new Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS);
                         startActivity(intent);
-                        settingsPrefs.edit().putBoolean("prevent_power_off", true).apply();
                     })
                     .setNegativeButton("Cancel", (dialog, which) -> {
                         switchSettingPreventPowerOff.setChecked(false);
                     })
+                    .setOnCancelListener(dialog -> switchSettingPreventPowerOff.setChecked(false))
                     .show();
             return;
         }
@@ -496,8 +534,13 @@ public class MainActivity extends AppCompatActivity implements AlarmsAdapter.OnA
             tvSettingExactAlarmStatus.setTextColor(ContextCompat.getColor(this, hasExact ? R.color.success : R.color.primary));
         }
 
-        // Prevent power-off status
-        boolean isPowerOffEnabled = settingsPrefs.getBoolean("prevent_power_off", false);
+        // Prevent power-off status (strictly requires Overlay + Accessibility permissions)
+        boolean hasOverlay = Build.VERSION.SDK_INT < Build.VERSION_CODES.M || Settings.canDrawOverlays(this);
+        boolean hasAccess = isAccessibilityServiceEnabled(this, InstalarmAccessibilityService.class);
+        boolean isPowerOffEnabled = settingsPrefs.getBoolean("prevent_power_off", false) && hasOverlay && hasAccess;
+        if (settingsPrefs.getBoolean("prevent_power_off", false) && (!hasOverlay || !hasAccess)) {
+            settingsPrefs.edit().putBoolean("prevent_power_off", false).apply();
+        }
         int blockCount = settingsPrefs.getInt("power_off_block_count", 0);
         if (switchSettingPreventPowerOff != null) {
             switchSettingPreventPowerOff.setOnCheckedChangeListener(null);
@@ -515,9 +558,12 @@ public class MainActivity extends AppCompatActivity implements AlarmsAdapter.OnA
             tvSettingPowerOffStatus.setTextColor(ContextCompat.getColor(this, isPowerOffEnabled ? R.color.success : R.color.text_secondary));
         }
 
-        // Prevent uninstall status
+        // Prevent uninstall status (strictly requires active Device Admin)
         boolean isAdminActive = devicePolicyManager != null && devicePolicyManager.isAdminActive(deviceAdminComponent);
-        boolean isUninstallEnabled = settingsPrefs.getBoolean("prevent_uninstall", false) || isAdminActive;
+        if (settingsPrefs.getBoolean("prevent_uninstall", false) != isAdminActive) {
+            settingsPrefs.edit().putBoolean("prevent_uninstall", isAdminActive).apply();
+        }
+        boolean isUninstallEnabled = isAdminActive;
         if (switchSettingPreventUninstall != null) {
             switchSettingPreventUninstall.setOnCheckedChangeListener(null);
             switchSettingPreventUninstall.setChecked(isUninstallEnabled);
@@ -953,22 +999,6 @@ public class MainActivity extends AppCompatActivity implements AlarmsAdapter.OnA
         ToggleButton btnFri = dialog.findViewById(R.id.btnDayFri);
         ToggleButton btnSat = dialog.findViewById(R.id.btnDaySat);
 
-        SwitchMaterial switchPreventPowerOff = dialog.findViewById(R.id.switchPreventPowerOff);
-        SwitchMaterial switchPreventUninstall = dialog.findViewById(R.id.switchPreventUninstall);
-
-        switchPreventPowerOff.setChecked(settingsPrefs.getBoolean("prevent_power_off", false));
-        switchPreventUninstall.setChecked(settingsPrefs.getBoolean("prevent_uninstall", false));
-
-        switchPreventPowerOff.setOnCheckedChangeListener((btn, isChecked) -> {
-            settingsPrefs.edit().putBoolean("prevent_power_off", isChecked).apply();
-            if (isChecked) requestPreventPowerOffActivation();
-        });
-
-        switchPreventUninstall.setOnCheckedChangeListener((btn, isChecked) -> {
-            settingsPrefs.edit().putBoolean("prevent_uninstall", isChecked).apply();
-            if (isChecked) requestDeviceAdminActivation();
-        });
-
         final String[] missionSlots = new String[]{"reels_10", "", ""};
         TextView tvMissionCountBadge = dialog.findViewById(R.id.tvMissionCountBadge);
         TextView[] slotIcons = new TextView[]{
@@ -1040,6 +1070,11 @@ public class MainActivity extends AppCompatActivity implements AlarmsAdapter.OnA
         tvSelectedSound.setText(currentSelectedSoundName);
 
         dialog.findViewById(R.id.btnSelectSound).setOnClickListener(v -> openRingtonePicker(currentSelectedSoundUri));
+        TextView btnPreviewDialog = dialog.findViewById(R.id.btnPreviewDialogSound);
+        if (btnPreviewDialog != null) {
+            btnPreviewDialog.setOnClickListener(v -> toggleSoundPreview(currentSelectedSoundUri, btnPreviewDialog));
+        }
+        dialog.setOnDismissListener(d -> stopSoundPreview());
 
         // Runnable to recalculate "Ring in X hr Y min" ticker inside dialog
         Runnable recalculateCountdown = () -> {
@@ -1477,6 +1512,56 @@ public class MainActivity extends AppCompatActivity implements AlarmsAdapter.OnA
             if (isAdminActive) {
                 Toast.makeText(this, "🔒 Device Administrator Activated", Toast.LENGTH_SHORT).show();
             }
+        }
+    }
+
+    private void toggleSoundPreview(String uriStr, TextView btn) {
+        if (previewPlayer != null && previewPlayer.isPlaying()) {
+            boolean sameButton = (activePreviewButton == btn);
+            stopSoundPreview();
+            if (sameButton) return;
+        }
+        try {
+            Uri soundUri = (uriStr != null && !uriStr.trim().isEmpty())
+                    ? Uri.parse(uriStr)
+                    : RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM);
+            if (soundUri == null) {
+                soundUri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_RINGTONE);
+            }
+            previewPlayer = new MediaPlayer();
+            if ("file".equals(soundUri.getScheme()) && soundUri.getPath() != null) {
+                java.io.FileInputStream fis = new java.io.FileInputStream(soundUri.getPath());
+                previewPlayer.setDataSource(fis.getFD());
+                fis.close();
+            } else {
+                previewPlayer.setDataSource(this, soundUri);
+            }
+            previewPlayer.setAudioAttributes(new AudioAttributes.Builder()
+                    .setUsage(AudioAttributes.USAGE_ALARM)
+                    .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                    .build());
+            previewPlayer.prepare();
+            previewPlayer.start();
+            activePreviewButton = btn;
+            if (btn != null) btn.setText("⏹");
+            previewPlayer.setOnCompletionListener(mp -> stopSoundPreview());
+        } catch (Exception e) {
+            stopSoundPreview();
+            Toast.makeText(this, "Could not play sound preview", Toast.LENGTH_SHORT).show();
+        }
+    }
+
+    private void stopSoundPreview() {
+        if (previewPlayer != null) {
+            try {
+                if (previewPlayer.isPlaying()) previewPlayer.stop();
+                previewPlayer.release();
+            } catch (Exception ignored) {}
+            previewPlayer = null;
+        }
+        if (activePreviewButton != null) {
+            activePreviewButton.setText("▶");
+            activePreviewButton = null;
         }
     }
 

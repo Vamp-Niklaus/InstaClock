@@ -61,9 +61,9 @@ public class AlarmReceiver extends BroadcastReceiver {
                     targetReels = Integer.parseInt(firstTask.split("_")[1]);
                 } catch (Exception ignored) {}
             }
+            // Start HUD overlay without auto-opening Instagram over lock screen
             InstalarmAccessibilityService.startReelsMission(
-                    context, targetReels, alarmId, label, soundUri, vibrate, snoozeDuration, remainingChain);
-            return;
+                    context, targetReels, alarmId, label, soundUri, vibrate, snoozeDuration, remainingChain, false);
         }
 
         Intent fullScreenIntent = new Intent(context, RingingActivity.class);

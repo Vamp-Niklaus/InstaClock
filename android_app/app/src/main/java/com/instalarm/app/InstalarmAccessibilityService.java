@@ -7,6 +7,7 @@ import android.content.Intent;
 import android.content.SharedPreferences;
 import android.graphics.Color;
 import android.graphics.PixelFormat;
+import android.media.AudioManager;
 import android.net.Uri;
 import android.os.Build;
 import android.os.CountDownTimer;
@@ -125,12 +126,18 @@ public class InstalarmAccessibilityService extends AccessibilityService {
     }
 
     public static void startReelsMission(Context context, int targetReels, long alarmId) {
-        startReelsMission(context, targetReels, alarmId, "Alarm", "", true, 5, "");
+        startReelsMission(context, targetReels, alarmId, "Alarm", "", true, 5, "", true);
     }
 
     public static void startReelsMission(Context context, int targetReels, long alarmId,
                                          String label, String soundUri, boolean vibrate,
                                          int snoozeDuration, String remainingTasks) {
+        startReelsMission(context, targetReels, alarmId, label, soundUri, vibrate, snoozeDuration, remainingTasks, false);
+    }
+
+    public static void startReelsMission(Context context, int targetReels, long alarmId,
+                                         String label, String soundUri, boolean vibrate,
+                                         int snoozeDuration, String remainingTasks, boolean openInstagramNow) {
         sMissionActive = true;
         sTargetReels = targetReels > 0 ? targetReels : 10;
         sWatchedReels = 0;
@@ -143,30 +150,63 @@ public class InstalarmAccessibilityService extends AccessibilityService {
         sLastCountTime = 0;
         sNextReelAllowedTime = System.currentTimeMillis() + 5000L;
 
-        // Mute loud alarm initially so reel audio is clear
-        AlarmService.muteSoundAndVibration();
-
         if (instance != null) {
             new Handler(Looper.getMainLooper()).post(() -> {
                 instance.showOverlay();
-                instance.startCountdownTicker();
+                instance.startAudioMonitor();
+                if (openInstagramNow) {
+                    instance.startCountdownTicker();
+                } else if (instance.tvOverlayStatus != null) {
+                    instance.tvOverlayStatus.setText("👆 Tap here to open Instagram");
+                    instance.tvOverlayStatus.setTextColor(Color.parseColor("#38BDF8"));
+                }
             });
         }
 
-        // Launch Native Instagram App directly to Reels
+        if (openInstagramNow) {
+            openInstagramReels(context);
+        }
+    }
+
+    public static void openInstagramReels(Context context) {
         Intent intent = new Intent(Intent.ACTION_VIEW, Uri.parse("https://www.instagram.com/reels/"));
         intent.setPackage("com.instagram.android");
         intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
         try {
             context.startActivity(intent);
         } catch (Exception e) {
-            // Fallback to launcher intent
             Intent launchIntent = context.getPackageManager().getLaunchIntentForPackage("com.instagram.android");
             if (launchIntent != null) {
                 launchIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
                 context.startActivity(launchIntent);
             }
         }
+    }
+
+    private final Handler audioMonitorHandler = new Handler(Looper.getMainLooper());
+    private long lastReelAudioActiveTime = 0;
+    private final Runnable audioMonitorRunnable = new Runnable() {
+        @Override
+        public void run() {
+            if (!sMissionActive) return;
+            AudioManager am = (AudioManager) getSystemService(Context.AUDIO_SERVICE);
+            boolean musicPlaying = am != null && am.isMusicActive();
+            if (isInInstagram && musicPlaying) {
+                lastReelAudioActiveTime = System.currentTimeMillis();
+                AlarmService.muteSoundAndVibration();
+            } else if (!isInInstagram) {
+                AlarmService.unmuteSoundAndVibration();
+            } else if (System.currentTimeMillis() - lastReelAudioActiveTime > 1500) {
+                AlarmService.unmuteSoundAndVibration();
+            }
+            audioMonitorHandler.postDelayed(this, 500);
+        }
+    };
+
+    private void startAudioMonitor() {
+        lastReelAudioActiveTime = 0;
+        audioMonitorHandler.removeCallbacks(audioMonitorRunnable);
+        audioMonitorHandler.postDelayed(audioMonitorRunnable, 500);
     }
 
     @Override
@@ -207,18 +247,32 @@ public class InstalarmAccessibilityService extends AccessibilityService {
             handleInstagramUsageAndLock(eventType, pkg);
         }
 
-        // 2. DETECT POWER-OFF / SHUTDOWN DIALOGS
+        // 2. DETECT POWER-OFF / SHUTDOWN DIALOGS (including Samsung One UI GlobalActions)
         boolean preventPowerOff = prefs.getBoolean("prevent_power_off", false);
         if (preventPowerOff) {
-            boolean isPowerMenu = cls.contains("globalactions") ||
+            boolean isPowerMenu = pkg.contains("globalactions") ||
+                                  cls.contains("globalactions") ||
                                   cls.contains("powerdialog") ||
                                   cls.contains("shutdown") ||
                                   cls.contains("poweroff") ||
                                   (pkg.contains("systemui") && cls.contains("actionsdialog"));
 
+            if (!isPowerMenu && eventType == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED
+                    && (pkg.contains("systemui") || pkg.contains("samsung"))) {
+                AccessibilityNodeInfo root = getRootInActiveWindow();
+                if (root != null) {
+                    List<AccessibilityNodeInfo> powerNodes = root.findAccessibilityNodeInfosByText("Power off");
+                    List<AccessibilityNodeInfo> restartNodes = root.findAccessibilityNodeInfosByText("Restart");
+                    if (powerNodes != null && !powerNodes.isEmpty() && restartNodes != null && !restartNodes.isEmpty()) {
+                        isPowerMenu = true;
+                    }
+                }
+            }
+
             if (isPowerMenu) {
                 performGlobalAction(GLOBAL_ACTION_BACK);
-                notifyBlockAction("Power-off action blocked by Instalarm!");
+                performGlobalAction(GLOBAL_ACTION_HOME);
+                notifyBlockAction("Power-off action blocked by InstaClock!");
 
                 int blocks = prefs.getInt("power_off_block_count", 0) + 1;
                 prefs.edit().putInt("power_off_block_count", blocks).apply();
@@ -283,17 +337,17 @@ public class InstalarmAccessibilityService extends AccessibilityService {
         // App switch detection
         if (eventType == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) {
             if (!pkg.contains("instagram") && !pkg.contains("instalarm")) {
+                isInInstagram = false;
                 // User navigated away from Instagram! Unmute alarm loudly
                 AlarmService.unmuteSoundAndVibration();
                 new Handler(Looper.getMainLooper()).post(() -> {
                     if (tvOverlayStatus != null) {
-                        tvOverlayStatus.setText("🚨 Alarm Ringing! Return to Instagram!");
+                        tvOverlayStatus.setText("🚨 Tap here to open Instagram!");
                         tvOverlayStatus.setTextColor(Color.parseColor("#FF5252"));
                     }
                 });
             } else if (pkg.contains("instagram")) {
-                // User is in Instagram, soften alarm so reel audio is audible
-                AlarmService.muteSoundAndVibration();
+                isInInstagram = true;
             }
         }
 
@@ -374,6 +428,13 @@ public class InstalarmAccessibilityService extends AccessibilityService {
                             overlayParams.y = initialY + (int) (event.getRawY() - initialTouchY);
                             if (windowManager != null && overlayView != null) {
                                 windowManager.updateViewLayout(overlayView, overlayParams);
+                            }
+                            return true;
+                        case MotionEvent.ACTION_UP:
+                            float dx = Math.abs(event.getRawX() - initialTouchX);
+                            float dy = Math.abs(event.getRawY() - initialTouchY);
+                            if (dx < 12 && dy < 12) {
+                                openInstagramReels(getApplicationContext());
                             }
                             return true;
                     }
@@ -494,6 +555,7 @@ public class InstalarmAccessibilityService extends AccessibilityService {
     }
 
     private void hideOverlay() {
+        audioMonitorHandler.removeCallbacks(audioMonitorRunnable);
         if (countdownTimer != null) {
             countdownTimer.cancel();
             countdownTimer = null;

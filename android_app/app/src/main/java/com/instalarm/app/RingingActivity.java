@@ -61,6 +61,10 @@ public class RingingActivity extends AppCompatActivity implements SensorEventLis
     private long lastShakeTime = 0;
     private static final int TARGET_SHAKES = 20;
 
+    private View layoutReelsTask;
+    private TextView tvReelsTaskTitle;
+    private Button btnOpenInstagramMission;
+
     private View layoutTaskCompleted;
     private boolean isTaskCompleted = false;
 
@@ -131,6 +135,10 @@ public class RingingActivity extends AppCompatActivity implements SensorEventLis
         tvShakeCount = findViewById(R.id.tvShakeCount);
         pbShakeProgress = findViewById(R.id.pbShakeProgress);
 
+        layoutReelsTask = findViewById(R.id.layoutReelsTask);
+        tvReelsTaskTitle = findViewById(R.id.tvReelsTaskTitle);
+        btnOpenInstagramMission = findViewById(R.id.btnOpenInstagramMission);
+
         layoutTaskCompleted = findViewById(R.id.layoutTaskCompleted);
 
         tvRingingLabel.setText(label);
@@ -163,12 +171,41 @@ public class RingingActivity extends AppCompatActivity implements SensorEventLis
     }
 
     private void setupDismissTask() {
-        if ("math".equalsIgnoreCase(dismissTask)) {
+        layoutMathTask.setVisibility(View.GONE);
+        layoutShakeTask.setVisibility(View.GONE);
+        if (layoutReelsTask != null) layoutReelsTask.setVisibility(View.GONE);
+
+        if (dismissTask.toLowerCase(Locale.US).startsWith("reels")) {
+            isTaskCompleted = false;
+            btnRingingDismiss.setEnabled(false);
+            btnRingingDismiss.setAlpha(0.4f);
+            if (layoutReelsTask != null) layoutReelsTask.setVisibility(View.VISIBLE);
+            int targetReels = 10;
+            if (dismissTask.contains("_")) {
+                try {
+                    targetReels = Integer.parseInt(dismissTask.split("_")[1]);
+                } catch (Exception ignored) {}
+            }
+            final int finalTarget = targetReels;
+            if (tvReelsTaskTitle != null) {
+                tvReelsTaskTitle.setText("Watch " + finalTarget + " Instagram Reels to dismiss");
+            }
+            if (btnOpenInstagramMission != null) {
+                btnOpenInstagramMission.setOnClickListener(v -> {
+                    if (!InstalarmAccessibilityService.isMissionActive()) {
+                        InstalarmAccessibilityService.startReelsMission(
+                                this, finalTarget, alarmId, label, soundUri, vibrate, snoozeDuration, remainingTasks, true);
+                    } else {
+                        InstalarmAccessibilityService.openInstagramReels(this);
+                    }
+                    finish();
+                });
+            }
+        } else if ("math".equalsIgnoreCase(dismissTask)) {
             isTaskCompleted = false;
             btnRingingDismiss.setEnabled(false);
             btnRingingDismiss.setAlpha(0.4f);
             layoutMathTask.setVisibility(View.VISIBLE);
-            layoutShakeTask.setVisibility(View.GONE);
             generateMathProblems(3);
             setupMathKeypad();
             displayCurrentMathProblem();
@@ -176,7 +213,6 @@ public class RingingActivity extends AppCompatActivity implements SensorEventLis
             isTaskCompleted = false;
             btnRingingDismiss.setEnabled(false);
             btnRingingDismiss.setAlpha(0.4f);
-            layoutMathTask.setVisibility(View.GONE);
             layoutShakeTask.setVisibility(View.VISIBLE);
             setupShakeSensor();
         } else {
@@ -184,8 +220,6 @@ public class RingingActivity extends AppCompatActivity implements SensorEventLis
             isTaskCompleted = true;
             btnRingingDismiss.setEnabled(true);
             btnRingingDismiss.setAlpha(1.0f);
-            layoutMathTask.setVisibility(View.GONE);
-            layoutShakeTask.setVisibility(View.GONE);
         }
     }
 
