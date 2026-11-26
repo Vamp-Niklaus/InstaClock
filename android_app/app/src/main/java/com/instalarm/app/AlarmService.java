@@ -98,8 +98,29 @@ public class AlarmService extends Service {
 
     public static void stopAlarm(Context context) {
         if (activeInstance != null) {
-            activeInstance.stopSelf();
-        } else {
+            AlarmService inst = activeInstance;
+            activeInstance = null;
+            inst.volumeGuardHandler.removeCallbacks(inst.volumeGuardRunnable);
+            if (inst.mediaPlayer != null) {
+                try {
+                    if (inst.mediaPlayer.isPlaying()) {
+                        inst.mediaPlayer.stop();
+                    }
+                    inst.mediaPlayer.release();
+                } catch (Exception ignored) {}
+                inst.mediaPlayer = null;
+            }
+            inst.stopVibration();
+            try {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+                    inst.stopForeground(STOP_FOREGROUND_REMOVE);
+                } else {
+                    inst.stopForeground(true);
+                }
+            } catch (Exception ignored) {}
+            inst.stopSelf();
+        }
+        if (context != null) {
             Intent stopIntent = new Intent(context, AlarmService.class);
             context.stopService(stopIntent);
         }
@@ -140,6 +161,11 @@ public class AlarmService extends Service {
         }
     }
 
+    private String activeDismissTask = "none";
+    private String activeSoundUri = "";
+    private boolean activeVibrate = true;
+    private int activeSnoozeDuration = 5;
+
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
         long alarmId = 0;
@@ -153,6 +179,11 @@ public class AlarmService extends Service {
             if (label == null || label.trim().isEmpty()) label = "Alarm";
             soundUri = intent.getStringExtra("sound_uri");
             vibrate = intent.getBooleanExtra("vibrate", true);
+            String task = intent.getStringExtra("dismiss_task");
+            if (task != null) activeDismissTask = task;
+            activeSoundUri = soundUri != null ? soundUri : "";
+            activeVibrate = vibrate;
+            activeSnoozeDuration = intent.getIntExtra("snooze_duration", 5);
         }
 
         boolean alreadyPlayingSame = mediaPlayer != null && activeAlarmId == alarmId && (mediaPlayer.isPlaying() || isMuted);
@@ -251,10 +282,14 @@ public class AlarmService extends Service {
     }
 
     private Notification buildForegroundNotification(long alarmId, String label) {
-        Intent fullScreenIntent = new Intent(this, MainActivity.class);
-        fullScreenIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
+        Intent fullScreenIntent = new Intent(this, RingingActivity.class);
+        fullScreenIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
         fullScreenIntent.putExtra("alarm_id", alarmId);
         fullScreenIntent.putExtra("alarm_label", label);
+        fullScreenIntent.putExtra("dismiss_task", activeDismissTask);
+        fullScreenIntent.putExtra("sound_uri", activeSoundUri);
+        fullScreenIntent.putExtra("vibrate", activeVibrate);
+        fullScreenIntent.putExtra("snooze_duration", activeSnoozeDuration);
 
         int flags = PendingIntent.FLAG_UPDATE_CURRENT;
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
@@ -271,7 +306,7 @@ public class AlarmService extends Service {
         return new NotificationCompat.Builder(this, CHANNEL_ID)
             .setSmallIcon(android.R.drawable.ic_lock_idle_alarm)
             .setContentTitle("InstaClock: " + label)
-            .setContentText("Alarm is ringing! Complete mission to dismiss.")
+            .setContentText("Alarm ringing. Tap to open.")
             .setPriority(NotificationCompat.PRIORITY_MAX)
             .setCategory(NotificationCompat.CATEGORY_ALARM)
             .setAutoCancel(false)

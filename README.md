@@ -32,6 +32,16 @@
 2. Download `InstaClock-vX.Y.Z.apk`.
 3. Open the APK on your Android device (Android 8.0 / API 26+) and allow installation.
 
+### Enabling Accessibility on Samsung Tablets (One UI) & Android 13+
+
+If **InstaClock** appears grayed out or displays a **Restricted setting** notice in Accessibility:
+
+1. Tap **InstaClock** once inside **Settings > Accessibility > Installed apps** so Android registers the request.
+2. Open **Settings > Apps > InstaClock**.
+3. Tap the three-dot menu icon in the top-right corner of the App Info screen.
+4. Select **Allow restricted settings** and verify using your PIN or fingerprint.
+5. Return to **Settings > Accessibility > Installed apps > InstaClock** and turn the service on.
+
 ---
 
 ## Permissions Used

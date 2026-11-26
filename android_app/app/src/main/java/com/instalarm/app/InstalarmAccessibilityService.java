@@ -7,7 +7,9 @@ import android.content.Intent;
 import android.content.SharedPreferences;
 import android.graphics.Color;
 import android.graphics.PixelFormat;
+import android.media.AudioAttributes;
 import android.media.AudioManager;
+import android.media.AudioPlaybackConfiguration;
 import android.net.Uri;
 import android.os.Build;
 import android.os.CountDownTimer;
@@ -158,7 +160,7 @@ public class InstalarmAccessibilityService extends AccessibilityService {
                 if (openInstagramNow) {
                     instance.startCountdownTicker();
                 } else if (instance.tvOverlayStatus != null) {
-                    instance.tvOverlayStatus.setText("👆 Tap here to open Instagram");
+                    instance.tvOverlayStatus.setText("Tap to open Instagram");
                     instance.tvOverlayStatus.setTextColor(Color.parseColor("#38BDF8"));
                 }
             });
@@ -185,61 +187,67 @@ public class InstalarmAccessibilityService extends AccessibilityService {
     }
 
     private final Handler audioMonitorHandler = new Handler(Looper.getMainLooper());
-    private long lastReelAudioActiveTime = 0;
+    private long audioStopTimestamp = 0;
+    private long currentSilenceWaitMs = 5000L;
     private final Runnable audioMonitorRunnable = new Runnable() {
         @Override
         public void run() {
             if (!sMissionActive) return;
             evaluateInstagramVsAlarmAudio();
-            audioMonitorHandler.postDelayed(this, 350);
+            audioMonitorHandler.postDelayed(this, 300);
         }
     };
 
     private void evaluateInstagramVsAlarmAudio() {
         AudioManager am = (AudioManager) getSystemService(Context.AUDIO_SERVICE);
-        int mediaVol = am != null ? am.getStreamVolume(AudioManager.STREAM_MUSIC) : 0;
-        boolean musicPlaying = am != null && am.isMusicActive();
+        if (am == null) return;
 
-        AccessibilityNodeInfo activeRoot = getRootInActiveWindow();
-        String activePkg = (activeRoot != null && activeRoot.getPackageName() != null)
-                ? activeRoot.getPackageName().toString().toLowerCase(Locale.US)
-                : "";
-        boolean foregroundInsta = "com.instagram.android".equals(activePkg)
-                || (isInInstagram && (activePkg.isEmpty() || activePkg.contains("inputmethod")));
-
-        boolean uiMuted = foregroundInsta && isInstagramUiMuted(activeRoot);
-        boolean instagramAudible = foregroundInsta && mediaVol > 0 && musicPlaying && !uiMuted;
-
-        if (instagramAudible) {
-            lastReelAudioActiveTime = System.currentTimeMillis();
-            AlarmService.muteSoundAndVibration();
-        } else if (!foregroundInsta || mediaVol <= 0 || uiMuted) {
-            AlarmService.unmuteSoundAndVibration();
-        } else if (System.currentTimeMillis() - lastReelAudioActiveTime > 700) {
-            AlarmService.unmuteSoundAndVibration();
-        }
-    }
-
-    private boolean isInstagramUiMuted(AccessibilityNodeInfo root) {
-        if (root == null) return false;
-        String[] muteLabels = new String[]{
-                "Sound is off", "Sound off", "Turn on sound", "Turn sound on",
-                "Audio is muted", "Video has no sound", "Tap to turn on audio"
-        };
-        for (String label : muteLabels) {
-            List<AccessibilityNodeInfo> nodes = root.findAccessibilityNodeInfosByText(label);
-            if (nodes != null && !nodes.isEmpty()) {
-                return true;
+        int mediaVol = am.getStreamVolume(AudioManager.STREAM_MUSIC);
+        boolean mediaActive = am.isMusicActive();
+        if (!mediaActive && Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            for (AudioPlaybackConfiguration cfg : am.getActivePlaybackConfigurations()) {
+                if (cfg.getAudioAttributes().getUsage() == AudioAttributes.USAGE_MEDIA) {
+                    mediaActive = true;
+                    break;
+                }
             }
         }
-        return false;
+
+        boolean mediaChannelPlaying = mediaVol > 0 && mediaActive;
+        long now = System.currentTimeMillis();
+
+        if (mediaChannelPlaying) {
+            // Media channel is actively producing sound: mute alarm immediately
+            AlarmService.muteSoundAndVibration();
+            if (audioStopTimestamp > 0) {
+                // Sound returned before grace window expired: reset timer to 2s for next pause
+                audioStopTimestamp = 0;
+                currentSilenceWaitMs = 2000L;
+            }
+        } else {
+            // Media channel is silent or volume is 0: wait 5s (or 2s after quick reset) before ringing
+            if (audioStopTimestamp == 0) {
+                audioStopTimestamp = now;
+            } else if (now - audioStopTimestamp >= currentSilenceWaitMs) {
+                AlarmService.unmuteSoundAndVibration();
+            }
+        }
     }
 
     private void startAudioMonitor() {
-        lastReelAudioActiveTime = 0;
+        audioStopTimestamp = 0;
+        currentSilenceWaitMs = 5000L;
         audioMonitorHandler.removeCallbacks(audioMonitorRunnable);
         evaluateInstagramVsAlarmAudio();
-        audioMonitorHandler.postDelayed(audioMonitorRunnable, 350);
+        audioMonitorHandler.postDelayed(audioMonitorRunnable, 300);
+    }
+
+    public static void cancelActiveMission() {
+        sMissionActive = false;
+        sRemainingTasks = "";
+        if (instance != null) {
+            new Handler(Looper.getMainLooper()).post(() -> instance.hideOverlay());
+        }
     }
 
     @Override
@@ -389,21 +397,31 @@ public class InstalarmAccessibilityService extends AccessibilityService {
     }
 
     private synchronized void handleReelsMissionEvent(int eventType, String pkg) {
-        // App switch detection
-        if (eventType == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED || eventType == AccessibilityEvent.TYPE_WINDOWS_CHANGED) {
-            if (!"com.instagram.android".equals(pkg) && !pkg.contains("inputmethod") && !pkg.isEmpty()) {
-                isInInstagram = false;
-                // User navigated away from Instagram! Unmute alarm loudly
-                AlarmService.unmuteSoundAndVibration();
+        // App switch detection (ignore transient overlays, systemui & inputmethod)
+        if (eventType == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) {
+            if ("com.instagram.android".equals(pkg)) {
+                isInInstagram = true;
                 new Handler(Looper.getMainLooper()).post(() -> {
-                    if (tvOverlayStatus != null) {
-                        tvOverlayStatus.setText("🚨 Tap here to open Instagram!");
+                    if (tvOverlayStatus != null && sMissionActive) {
+                        if (System.currentTimeMillis() >= sNextReelAllowedTime) {
+                            tvOverlayStatus.setText("Scroll next");
+                            tvOverlayStatus.setTextColor(Color.parseColor("#00E676"));
+                        } else {
+                            startCountdownTicker();
+                        }
+                    }
+                });
+            } else if (!pkg.isEmpty()
+                    && !pkg.contains("instalarm")
+                    && !pkg.contains("systemui")
+                    && !pkg.contains("inputmethod")) {
+                isInInstagram = false;
+                new Handler(Looper.getMainLooper()).post(() -> {
+                    if (tvOverlayStatus != null && sMissionActive) {
+                        tvOverlayStatus.setText("Tap to open Instagram");
                         tvOverlayStatus.setTextColor(Color.parseColor("#FF5252"));
                     }
                 });
-            } else if ("com.instagram.android".equals(pkg)) {
-                isInInstagram = true;
-                evaluateInstagramVsAlarmAudio();
             }
         }
 
@@ -507,7 +525,7 @@ public class InstalarmAccessibilityService extends AccessibilityService {
     private void updateOverlayUI() {
         if (overlayView == null) return;
 
-        tvOverlayCount.setText(String.format(Locale.getDefault(), "Watched: %d / %d Reels", sWatchedReels, sTargetReels));
+        tvOverlayCount.setText(String.format(Locale.getDefault(), "%d / %d Reels", sWatchedReels, sTargetReels));
         int percent = (int) (((float) sWatchedReels / (float) sTargetReels) * 100);
         if (percent > 100) percent = 100;
         tvOverlayPercent.setText(percent + "%");
@@ -524,15 +542,15 @@ public class InstalarmAccessibilityService extends AccessibilityService {
             public void onTick(long millisUntilFinished) {
                 if (tvOverlayStatus != null && sMissionActive) {
                     long sec = (millisUntilFinished / 1000) + 1;
-                    tvOverlayStatus.setText(String.format(Locale.getDefault(), "⏳ Watch current reel (%ds)...", sec));
-                    tvOverlayStatus.setTextColor(Color.parseColor("#E2E8F0"));
+                    tvOverlayStatus.setText(String.format(Locale.getDefault(), "Watch (%ds)", sec));
+                    tvOverlayStatus.setTextColor(Color.parseColor("#CBD5E1"));
                 }
             }
 
             @Override
             public void onFinish() {
                 if (tvOverlayStatus != null && sMissionActive) {
-                    tvOverlayStatus.setText("✅ Ready! Scroll down for +1 ⬇️");
+                    tvOverlayStatus.setText("Scroll next");
                     tvOverlayStatus.setTextColor(Color.parseColor("#00E676"));
                 }
             }
@@ -557,7 +575,7 @@ public class InstalarmAccessibilityService extends AccessibilityService {
             final String nextChain = sRemainingTasks.trim();
             sRemainingTasks = "";
             if (tvOverlayStatus != null) {
-                tvOverlayStatus.setText("✅ Reels done! Next mission...");
+                tvOverlayStatus.setText("Reels done. Starting next mission...");
                 tvOverlayStatus.setTextColor(Color.parseColor("#00E676"));
             }
             AlarmService.unmuteSoundAndVibration();
@@ -593,10 +611,10 @@ public class InstalarmAccessibilityService extends AccessibilityService {
             }
         }
 
-        // Show victory status in HUD
+        // Show completion status in HUD (dynamic target count)
         if (tvOverlayStatus != null) {
-            tvOverlayStatus.setText("🎉 10/10 REELS COMPLETE! ALARM OFF!");
-            tvOverlayStatus.setTextColor(Color.parseColor("#FFD700"));
+            tvOverlayStatus.setText(String.format(Locale.getDefault(), "%d/%d complete. Alarm off.", sWatchedReels, sTargetReels));
+            tvOverlayStatus.setTextColor(Color.parseColor("#00E676"));
         }
 
         new Handler(Looper.getMainLooper()).postDelayed(() -> {

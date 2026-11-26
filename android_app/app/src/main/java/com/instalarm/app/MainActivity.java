@@ -156,9 +156,9 @@ public class MainActivity extends AppCompatActivity implements AlarmsAdapter.OnA
         if (intent != null && intent.getBooleanExtra("mission_accomplished", false)) {
             intent.removeExtra("mission_accomplished");
             new AlertDialog.Builder(this)
-                    .setTitle("🎉 Mission Accomplished!")
-                    .setMessage("You watched all required Instagram Reels!\nYou are now awake, and your alarm has been turned off.\nHave an awesome day!")
-                    .setPositiveButton("Awesome", null)
+                    .setTitle("Mission Complete")
+                    .setMessage("Your wake-up mission is complete and the alarm has been turned off.")
+                    .setPositiveButton("OK", null)
                     .show();
         }
     }
@@ -476,9 +476,9 @@ public class MainActivity extends AppCompatActivity implements AlarmsAdapter.OnA
 
         if (!isAccessibilityEnabled) {
             new AlertDialog.Builder(this)
-                    .setTitle("Accessibility Permission")
-                    .setMessage("To detect when the power-off or shutdown menu is opened, please enable 'InstaClock' in Accessibility Settings.")
-                    .setPositiveButton("Open Settings", (dialog, which) -> {
+                    .setTitle("Accessibility Permission Required")
+                    .setMessage("Enable InstaClock under Accessibility > Installed apps.\n\nOn Samsung tablets (One UI) or Android 13+:\n1. Tap InstaClock in Accessibility once if it shows Restricted setting.\n2. Open Settings > Apps > InstaClock.\n3. Tap the 3-dot menu at the top right and select Allow restricted settings.\n4. Return to Accessibility > Installed apps > InstaClock and turn it on.")
+                    .setPositiveButton("Open Accessibility", (dialog, which) -> {
                         Intent intent = new Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS);
                         startActivity(intent);
                     })
@@ -492,7 +492,7 @@ public class MainActivity extends AppCompatActivity implements AlarmsAdapter.OnA
 
         settingsPrefs.edit().putBoolean("prevent_power_off", true).apply();
         updateSettingsDisplay();
-        Toast.makeText(this, "🛡️ Prevent Power-off is Active", Toast.LENGTH_SHORT).show();
+        Toast.makeText(this, "Prevent power-off enabled", Toast.LENGTH_SHORT).show();
     }
 
     private void requestDeviceAdminActivation() {
@@ -564,7 +564,7 @@ public class MainActivity extends AppCompatActivity implements AlarmsAdapter.OnA
             });
         }
         if (tvSettingPowerOffStatus != null) {
-            tvSettingPowerOffStatus.setText(isPowerOffEnabled ? "Active • Blocked " + blockCount + " times" : "Disabled • Tap to configure");
+            tvSettingPowerOffStatus.setText(isPowerOffEnabled ? "Enabled" : "Disabled");
             tvSettingPowerOffStatus.setTextColor(ContextCompat.getColor(this, isPowerOffEnabled ? R.color.success : R.color.text_secondary));
         }
 
@@ -589,7 +589,7 @@ public class MainActivity extends AppCompatActivity implements AlarmsAdapter.OnA
             });
         }
         if (tvSettingUninstallStatus != null) {
-            tvSettingUninstallStatus.setText(isUninstallEnabled ? "Active (Device Admin Locked)" : "Device Admin protection");
+            tvSettingUninstallStatus.setText(isUninstallEnabled ? "Enabled" : "Disabled");
             tvSettingUninstallStatus.setTextColor(ContextCompat.getColor(this, isUninstallEnabled ? R.color.success : R.color.text_secondary));
         }
 
@@ -789,10 +789,20 @@ public class MainActivity extends AppCompatActivity implements AlarmsAdapter.OnA
             Toast.makeText(this, "Alarm set for " + alarm.getFormattedTime() + " " + alarm.getAmPm(), Toast.LENGTH_SHORT).show();
         } else {
             AlarmScheduler.cancelAlarm(this, alarm.getId());
+            if (AlarmService.isAlarmRunning() && (AlarmService.getCurrentAlarmId() == alarm.getId() || AlarmService.getCurrentAlarmId() <= 0)) {
+                AlarmService.stopAlarm(this);
+                InstalarmAccessibilityService.cancelActiveMission();
+            }
             Toast.makeText(this, "Alarm disabled", Toast.LENGTH_SHORT).show();
         }
 
-        loadAlarms();
+        updateUpcomingAlarmTicker();
+        UpcomingAlarmNotificationManager.updateUpcomingAlarmNotification(this);
+        if (rvAlarms != null) {
+            rvAlarms.post(() -> {
+                if (alarmsAdapter != null) alarmsAdapter.notifyDataSetChanged();
+            });
+        }
     }
 
     @Override
@@ -822,6 +832,10 @@ public class MainActivity extends AppCompatActivity implements AlarmsAdapter.OnA
         alarm.setEnabled(false);
         alarmDatabase.updateAlarm(alarm);
         AlarmScheduler.cancelAlarm(this, alarm.getId());
+        if (AlarmService.isAlarmRunning() && (AlarmService.getCurrentAlarmId() == alarm.getId() || AlarmService.getCurrentAlarmId() <= 0)) {
+            AlarmService.stopAlarm(this);
+            InstalarmAccessibilityService.cancelActiveMission();
+        }
         Toast.makeText(this, "Alarm skipped", Toast.LENGTH_SHORT).show();
         loadAlarms();
     }
@@ -853,6 +867,10 @@ public class MainActivity extends AppCompatActivity implements AlarmsAdapter.OnA
                 .setMessage("Are you sure you want to delete this alarm?")
                 .setPositiveButton("Delete", (dialog, which) -> {
                     AlarmScheduler.cancelAlarm(this, alarm.getId());
+                    if (AlarmService.isAlarmRunning() && (AlarmService.getCurrentAlarmId() == alarm.getId() || AlarmService.getCurrentAlarmId() <= 0)) {
+                        AlarmService.stopAlarm(this);
+                        InstalarmAccessibilityService.cancelActiveMission();
+                    }
                     alarmDatabase.deleteAlarm(alarm.getId());
                     alarmList.remove(position);
                     alarmsAdapter.notifyItemRemoved(position);

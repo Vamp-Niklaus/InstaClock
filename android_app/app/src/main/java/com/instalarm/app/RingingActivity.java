@@ -104,6 +104,16 @@ public class RingingActivity extends AppCompatActivity implements SensorEventLis
         clockHandler.postDelayed(clockRunnable, 1000);
     }
 
+    @Override
+    protected void onNewIntent(Intent intent) {
+        super.onNewIntent(intent);
+        setIntent(intent);
+        extractIntentData();
+        tvRingingLabel.setText(label);
+        btnRingingSnooze.setText("Snooze (" + snoozeDuration + "m)");
+        setupDismissTask();
+    }
+
     private void extractIntentData() {
         Intent intent = getIntent();
         alarmId = intent.getLongExtra("alarm_id", 0);

@@ -38,8 +38,10 @@ public class AlarmReceiver extends BroadcastReceiver {
         Intent serviceIntent = new Intent(context, AlarmService.class);
         serviceIntent.putExtra("alarm_id", alarmId);
         serviceIntent.putExtra("alarm_label", label);
+        serviceIntent.putExtra("dismiss_task", dismissTask);
         serviceIntent.putExtra("sound_uri", soundUri);
         serviceIntent.putExtra("vibrate", vibrate);
+        serviceIntent.putExtra("snooze_duration", snoozeDuration);
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             context.startForegroundService(serviceIntent);
